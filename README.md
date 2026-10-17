@@ -115,6 +115,30 @@ void store.load(async ({ signal }) => {
 
 `load` never rejects, applies subject, context, and engine atomically, and ignores stale results when called again (for example on a tenant switch). Details in the [core README](./packages/core/README.md#loading-state-async-data).
 
+## Multi-tenancy and public access
+
+**Tenants.** The tenant always travels in `context.tenantId`. For ReBAC, `createTenantRelationGraph` gives each tenant its own graph, and the evaluator picks it by `context.tenantId`, so a relation in one tenant can never grant access in another, even when their references look alike. With no tenant, or an unknown one, the evaluator has no opinion and the result is `deny`.
+
+```ts
+const graph = createTenantRelationGraph({
+  tuples: {
+    acme: [{ object: "doc:1", relation: "viewer", subject: "user:ana" }],
+    globex: [{ object: "doc:1", relation: "viewer", subject: "user:bob" }],
+  },
+});
+const rebac = createRebacEvaluator({ graph, requirements: { doc: { read: "viewer" } } });
+
+store.setContext({ tenantId: "acme" }); // switching tenant switches the graph
+```
+
+**Public access.** A tuple whose subject is `"<type>:*"` grants the relation to every subject of that type, the way OpenFGA does:
+
+```ts
+{ object: "doc:handbook", relation: "viewer", subject: "user:*" } // any "user:..."
+```
+
+Details, limits, and the rules for wildcards are in the [core README](./packages/core/README.md#rebac-createrelationgraph--createrebacevaluator). RBAC and ABAC have no tenant graph: carry the tenant in the roles you load for that tenant, or compare `context.tenantId` in an ABAC condition.
+
 ## Typed actions and resources
 
 By default actions and resource types are plain strings. Declare a **schema** and the compiler checks them everywhere: permission strings, policy scopes, relation requirements, and every `can(...)` / `useCan(...)` / `<Can>`. A typo or an action on the wrong resource stops compiling.
@@ -278,7 +302,8 @@ Rule of thumb: **mistakes in configuration throw when you create the engine, eva
 | An `onDecision` hook that throws | — | The decision is unaffected; the hook's error is rethrown asynchronously. |
 | An evaluator that throws, or returns a malformed decision | — | `deny`. The error detail is not exposed in the decision. |
 | An evaluator called directly (outside an engine or store) with a structurally invalid input | — | May throw a `TypeError`. The engine and the store catch it and deny, so always evaluate through one of them. |
-| ReBAC wildcard subjects (such as OpenFGA's `user:*`) | not supported | Kept as written and match nobody. |
+| ReBAC wildcard in a userset (`team:*#member`) or with no type (`:*`) | not supported | Rejected when the graph is created (`TUPLE_REFERENCE_INVALID`). Plain `<type>:*` subjects are supported. |
+| ReBAC tenant graph with no `context.tenantId`, or an unknown tenant | — | The evaluator has no opinion, so the result is `deny`. |
 | Schema typing (`forSchema`) | compile-time only | No runtime effect: plain JavaScript callers are still validated when evaluators are created. |
 | Evaluation | synchronous only | There is no async evaluator. Fetch data with `store.load(...)` (see [Loading state](#loading-state)); until it arrives, every check is denied with code `LOADING`. |
 | A loader that throws or returns invalid data | — | The store goes to `"error"` and denies everything (`LOAD_FAILED`); `load` itself never rejects. |
@@ -377,7 +402,7 @@ const decision = store.evaluate("update", resource);
 | | `POLICY_SCOPE_INVALID` | `policyId`, `option` |
 | | `CONDITION_OPERATOR_UNKNOWN`, `CONDITION_ARRAY_REQUIRED` | `policyId`, `operator` |
 | | `CONDITION_FIELD_INVALID` | `policyId`, `field` |
-| ReBAC | `GRAPH_TUPLES_INVALID`, `GRAPH_RULES_INVALID`, `GRAPH_MAX_DEPTH_INVALID`, `REBAC_GRAPH_REQUIRED`, `REBAC_REQUIREMENTS_INVALID` | — |
+| ReBAC | `GRAPH_TUPLES_INVALID`, `GRAPH_RULES_INVALID`, `GRAPH_MAX_DEPTH_INVALID`, `TENANT_GRAPH_INVALID`, `TENANT_ID_INVALID`, `REBAC_GRAPH_REQUIRED`, `REBAC_REQUIREMENTS_INVALID` | — |
 | | `TUPLE_NOT_OBJECT`, `TUPLE_FIELDS_INVALID`, `TUPLE_REFERENCE_INVALID` | `index` |
 | | `RULE_NOT_OBJECT`, `RULE_IMPLIED_BY_INVALID`, `RULE_INHERIT_FROM_INVALID` | `relation` |
 | | `REBAC_REQUIREMENT_TYPE_INVALID` | `resourceType` |
