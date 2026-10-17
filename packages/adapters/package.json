@@ -1,0 +1,70 @@
+{
+  "name": "@useguardril/adapters",
+  "version": "0.1.0",
+  "description": "Adapters that normalize backend responses (sessions, roles, relation tuples) into the @useguardril/core contract.",
+  "keywords": [
+    "authorization",
+    "rbac",
+    "rebac",
+    "abac",
+    "openfga",
+    "spicedb",
+    "adapters",
+    "typescript",
+    "esm",
+    "cjs"
+  ],
+  "license": "ISC",
+  "author": "",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.3.4"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "peerDependencies": {
+    "@useguardril/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@useguardril/core": "workspace:*",
+    "tsup": "8.5.1",
+    "typescript": "5.7.3",
+    "vitest": "4.1.11"
+  }
+}
