@@ -60,11 +60,52 @@ function Invoice({ id }: { id: string }) {
 |---|---|
 | `AuthorizationProvider` | Provides a store to the tree. Takes a `store` prop. |
 | `useCan(action, resource)` | `boolean`. Re-renders only when this answer flips. |
-| `<Can action resource fallback?>` | Renders `children` when allowed, `fallback` otherwise. |
+| `<Can action resource fallback? loading?>` | Renders `children` when allowed, `fallback` when denied, and `loading` while the data loads (defaults to `fallback`). |
+| `useAccess(action, resource)` | `"loading" \| "allowed" \| "denied"`. Like `useCan`, but tells "still loading" apart from "denied". |
+| `useAuthorizationStatus()` | `"loading" \| "ready" \| "error"`. |
+| `useAuthorizationError()` | Why the last load failed, or `undefined`. |
 | `useSubject()` | The current subject, or `undefined`. |
 | `useAuthorizationStore()` | The store, to call `setSubject`, `setContext`, or `setEngine`. Never re-renders. |
 
 Change who the user is, the tenant, or the policies by calling the store's setters (for example after sign-in); subscribed components update on their own.
+
+## Loading state
+
+Create the store in `"loading"` and fill it with `store.load(...)` (see the [core README](../core/README.md#loading-state-async-data)). Until the data arrives every check is denied, so use `<Can loading>` or `useAccess` to show a skeleton instead of flashing "no access":
+
+```tsx
+const store = createAuthorizationStore({ engine, status: "loading" });
+void store.load(async ({ signal }) => {
+  const me = await fetch("/api/me", { signal }).then((r) => r.json());
+  return { subject: { id: me.id, roles: me.roles }, context: { tenantId: me.org } };
+});
+
+function InvoiceActions({ id }: { id: string }) {
+  const status = useAuthorizationStatus();
+  if (status === "error") return <RetryBanner />;
+
+  return (
+    <Can
+      action="update"
+      resource={{ type: "invoice", id }}
+      loading={<Skeleton />}
+      fallback={<ReadOnlyBadge />}
+    >
+      <EditButton />
+    </Can>
+  );
+}
+```
+
+`useAccess` gives the same three-way answer as a value:
+
+```tsx
+const access = useAccess("read", { type: "invoice", id });
+if (access === "loading") return <Skeleton />;
+return access === "allowed" ? <Invoice /> : <NoAccess />;
+```
+
+Each hook re-renders only when its own value changes, so going from `"loading"` to `"allowed"` is a single re-render and never passes through `"denied"`.
 
 ## Errors
 
