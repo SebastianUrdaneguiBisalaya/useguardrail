@@ -1,8 +1,10 @@
+export { createContext } from "./context/index.js";
 export type { Engine, EngineConfig } from "./engine/index.js";
 export { createEngine } from "./engine/index.js";
 export {
   AdapterMappingError,
   AuthorizationError,
+  InvalidContextError,
   InvalidPolicyError,
 } from "./errors.js";
 export type {
@@ -26,6 +28,14 @@ export type {
   RoleDefinition,
 } from "./rules/index.js";
 export { createAbacEvaluator, createRbacEvaluator } from "./rules/index.js";
+export type {
+  AuthorizationState,
+  AuthorizationStore,
+  AuthorizationStoreConfig,
+} from "./store/authorization.js";
+export { createAuthorizationStore } from "./store/authorization.js";
+export type { Listener, Store, Unsubscribe } from "./store/index.js";
+export { createStore } from "./store/index.js";
 export type {
   Action,
   Attributes,
