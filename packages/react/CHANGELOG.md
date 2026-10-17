@@ -2,7 +2,7 @@
 
 All notable changes to `@useguardril/react` are documented here. This project follows [Semantic Versioning](https://semver.org/).
 
-## 0.1.0 (unreleased)
+## 0.1.0 - 2026-10-17
 
 ### Added
 
