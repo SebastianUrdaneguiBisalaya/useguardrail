@@ -144,6 +144,25 @@ describe("createRelationGraph", () => {
     ).toBe(false);
   });
 
+  it("keeps every subject when several share the same object and relation", () => {
+    const graph = createRelationGraph({
+      tuples: [
+        tuple("doc:1", "viewer", "user:ana"),
+        tuple("doc:1", "viewer", "user:bob"),
+        tuple("doc:1", "viewer", "team:eng#member"),
+        tuple("team:eng", "member", "user:eve"),
+      ],
+    });
+    for (const user of [
+      "user:ana",
+      "user:bob",
+      "user:eve",
+    ]) {
+      expect(graph.check(user, "viewer", "doc:1")).toBe(true);
+    }
+    expect(graph.check("user:zed", "viewer", "doc:1")).toBe(false);
+  });
+
   it("is isolated from later mutation of the input", () => {
     const tuples = [
       tuple("doc:1", "viewer", "user:ana"),

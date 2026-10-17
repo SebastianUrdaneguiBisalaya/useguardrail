@@ -415,6 +415,56 @@ describe("createAbacEvaluator", () => {
     expect(e(input())?.effect).toBe("allow");
   });
 
+  it("rejects a non-object condition, non-array conditions, and a non-string field", () => {
+    const bad = (policy: unknown) => () =>
+      createAbacEvaluator({
+        policies: [
+          policy,
+        ],
+      } as never);
+    expect(
+      bad({
+        conditions: [
+          null,
+        ],
+        effect: "allow",
+        id: "p",
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: "CONDITION_NOT_OBJECT",
+      }),
+    );
+    expect(
+      bad({
+        conditions: "x",
+        effect: "allow",
+        id: "p",
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: "POLICY_CONDITIONS_INVALID",
+      }),
+    );
+    expect(
+      bad({
+        conditions: [
+          {
+            field: 5,
+            op: "eq",
+            value: 1,
+          },
+        ],
+        effect: "allow",
+        id: "p",
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: "CONDITION_FIELD_INVALID",
+      }),
+    );
+  });
+
   it("rejects malformed policies", () => {
     const bad = (policies: unknown) => () =>
       createAbacEvaluator({

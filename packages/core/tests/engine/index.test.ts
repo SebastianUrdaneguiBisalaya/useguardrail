@@ -130,6 +130,25 @@ describe("createEngine", () => {
     expect(engine.evaluate(input).effect).toBe("deny");
   });
 
+  it("denies when an evaluator returns something that is not an object", () => {
+    for (const value of [
+      "allow",
+      42,
+      true,
+      null,
+    ]) {
+      const bad = (() => value) as unknown as Evaluator;
+      const decision = createEngine({
+        evaluators: [
+          allow,
+          bad,
+        ],
+      }).evaluate(input);
+      expect(decision.effect).toBe("deny");
+      expect(decision.code).toBe("EVALUATOR_MALFORMED");
+    }
+  });
+
   it("rejects invalid configuration", () => {
     expect(() =>
       createEngine({
