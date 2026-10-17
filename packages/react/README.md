@@ -69,6 +69,30 @@ function Invoice({ id }: { id: string }) {
 
 Change who the user is, the tenant, or the policies by calling the store's setters (for example after sign-in); subscribed components update on their own.
 
+## Typed schema
+
+Bind the provider, `Can`, `useCan`, and `useAccess` to your schema once, and actions and resource types are checked at compile time. Use the same `AppSchema` you gave to `forSchema` from `@useguardril/core`:
+
+```tsx
+// authorization-ui.ts
+import { forSchema } from "@useguardril/react";
+
+type AppSchema = { invoice: "read" | "update" | "delete"; user: "read" | "invite" };
+
+export const { AuthorizationProvider, Can, useCan, useAccess, useAuthorizationStore } =
+  forSchema<AppSchema>();
+```
+
+```tsx
+useCan("update", { type: "invoice", id });          // ok
+useCan("invite", { type: "invoice" });              // compile error: invite is a user action
+<Can action="invite" resource={{ type: "user" }}>   // ok
+  <InviteButton />
+</Can>;
+```
+
+`forSchema` returns the same components and hooks, only retyped: no runtime cost. The untyped `AuthorizationProvider` also accepts a schema-bound store.
+
 ## Loading state
 
 Create the store in `"loading"` and fill it with `store.load(...)` (see the [core README](../core/README.md#loading-state-async-data)). Until the data arrives every check is denied, so use `<Can loading>` or `useAccess` to show a skeleton instead of flashing "no access":
