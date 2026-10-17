@@ -14,3 +14,5 @@ export {
   AuthorizationProvider,
   useAuthorizationStore,
 } from "./provider/index.js";
+export type { SchemaCanProps, SchemaKit } from "./schema.js";
+export { forSchema } from "./schema.js";
