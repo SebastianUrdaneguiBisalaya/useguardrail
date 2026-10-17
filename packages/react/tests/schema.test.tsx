@@ -1,5 +1,5 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { forSchema as coreForSchema } from "@useguardril/core";
+import { forSchema as coreForSchema } from "@useguardrail/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { Can, forSchema, useAccess, useCan } from "../src/index.js";
 

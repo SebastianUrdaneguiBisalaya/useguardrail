@@ -1,4 +1,4 @@
-# @useguardril/core
+# @useguardrail/core
 
 Framework-independent authorization engine for the frontend: **RBAC**, **ABAC**, and **ReBAC** behind one evaluation API, plus a small reactive store. Zero runtime dependencies; runs in the browser and in Node.
 
@@ -7,7 +7,7 @@ Framework-independent authorization engine for the frontend: **RBAC**, **ABAC**,
 ## Installation
 
 ```bash
-pnpm add -E @useguardril/core
+pnpm add -E @useguardrail/core
 ```
 
 Works with `import` (ESM) and `require` (CJS), with bundled types.
@@ -26,7 +26,7 @@ You build **evaluators** (one per authorization model), hand them to an **engine
 `evaluate` is synchronous and never throws.
 
 ```ts
-import { createEngine, createRbacEvaluator } from "@useguardril/core";
+import { createEngine, createRbacEvaluator } from "@useguardrail/core";
 
 const rbac = createRbacEvaluator({
   roles: {
@@ -57,7 +57,7 @@ Permissions are `"<resourceType>:<action>"`; either side may be `"*"`, and `"*"`
 Policies with `allow`/`deny` effects, optional `actions` and `resources` scopes, and `conditions`. The policy's top-level `conditions` must all hold (AND); use `any` and `not` inside them for OR and NOT. A `field` is a dot path starting at `subject`, `action`, `resource`, or `context`; compare it with a literal `value` or another field through `valueFrom`.
 
 ```ts
-import { createAbacEvaluator } from "@useguardril/core";
+import { createAbacEvaluator } from "@useguardrail/core";
 
 const abac = createAbacEvaluator({
   policies: [
@@ -122,7 +122,7 @@ A condition is either a field comparison or a group, and groups nest:
 Facts are tuples `{ object, relation, subject }`. Subjects may be usersets (`"team:eng#member"`) or wildcards (`"user:*"`). Rules add implied relations and inheritance through links such as `parent`. Traversal is cycle-safe and depth-limited (`maxDepth`, 16 by default; deeper paths count as not related).
 
 ```ts
-import { createRebacEvaluator, createRelationGraph } from "@useguardril/core";
+import { createRebacEvaluator, createRelationGraph } from "@useguardrail/core";
 
 const graph = createRelationGraph({
   tuples: [
@@ -148,7 +148,7 @@ The subject reference is `subject.id`; the resource reference is `"<type>:<id>"`
 A tuple whose subject is `"<type>:*"` grants the relation to **every subject whose reference starts with `<type>:`**:
 
 ```ts
-import { createRelationGraph } from "@useguardril/core";
+import { createRelationGraph } from "@useguardrail/core";
 
 const graph = createRelationGraph({
   tuples: [{ object: "doc:handbook", relation: "viewer", subject: "user:*" }],
@@ -168,7 +168,7 @@ graph.check("bot:r2", "viewer", "doc:handbook"); // false: different type
 For multi-tenant apps, give each tenant its own graph so a relation in one tenant can never grant access in another, even when their references look alike:
 
 ```ts
-import { createRebacEvaluator, createTenantRelationGraph } from "@useguardril/core";
+import { createRebacEvaluator, createTenantRelationGraph } from "@useguardrail/core";
 
 const graph = createTenantRelationGraph({
   tuples: {
@@ -195,7 +195,7 @@ Tenancy is always explicit, carried in `context`, never in module-level state. `
 `createAuthorizationStore` couples an engine with the current subject and context. It exposes `subscribe` and `getSnapshot`, so it works directly with React's `useSyncExternalStore`.
 
 ```ts
-import { createAuthorizationStore } from "@useguardril/core";
+import { createAuthorizationStore } from "@useguardrail/core";
 
 const store = createAuthorizationStore({
   engine,
@@ -228,7 +228,7 @@ Two helpers exist for UI adapters and server rendering:
 `engine.explain(input)` and `store.explain(action, resource)` return the decision together with a per-evaluator `trace` (and, for the store, the `status` and subject it ran in), so you can find out why something was denied. `onDecision` on `createEngine` and `createAuthorizationStore` receives the same event after every evaluation; the library never logs on its own.
 
 ```ts
-import { createEngine } from "@useguardril/core";
+import { createEngine } from "@useguardrail/core";
 
 const engine = createEngine({
   evaluators,
@@ -254,7 +254,7 @@ Evaluation stops at the first evaluator that denies, throws, or misbehaves, so l
 Declare which actions each resource type supports and the compiler checks every permission, policy scope, relation requirement, and `can(...)` call:
 
 ```ts
-import { forSchema } from "@useguardril/core";
+import { forSchema } from "@useguardrail/core";
 
 type AppSchema = {
   invoice: "read" | "update" | "delete";
@@ -292,7 +292,7 @@ Evaluation is always **synchronous**. What is asynchronous is getting the data (
 Without this, a store created before the session arrives would answer "no access" and the UI would flash a denial, then flip to allowed. Start in `"loading"` instead and let `load` fill the store:
 
 ```ts
-import { createAuthorizationStore } from "@useguardril/core";
+import { createAuthorizationStore } from "@useguardrail/core";
 
 const store = createAuthorizationStore({ engine, status: "loading" });
 
@@ -324,7 +324,7 @@ import {
   createAbacEvaluator,
   InvalidContextError,
   InvalidPolicyError,
-} from "@useguardril/core";
+} from "@useguardrail/core";
 
 try {
   createAbacEvaluator({ policies: [{ id: "x", effect: "allow", conditions: [{ field: "nope", op: "eq", value: 1 }] }] });
@@ -345,7 +345,7 @@ try {
 
 ## API reference
 
-Everything `@useguardril/core` exports. Each name links to where it is explained above, or is described here.
+Everything `@useguardrail/core` exports. Each name links to where it is explained above, or is described here.
 
 **Factories and functions**
 
@@ -368,7 +368,7 @@ Everything `@useguardril/core` exports. Each name links to where it is explained
 | Export | Purpose |
 |---|---|
 | `AuthorizationError` | Base class of every error; has `code` and `params`. |
-| `InvalidPolicyError`, `InvalidContextError`, `AdapterMappingError` | Malformed policy / subject or context / backend data (the last one is thrown by `@useguardril/adapters`). |
+| `InvalidPolicyError`, `InvalidContextError`, `AdapterMappingError` | Malformed policy / subject or context / backend data (the last one is thrown by `@useguardrail/adapters`). |
 | `ERROR_CODES`, `DECISION_CODES`, `MAX_CONDITION_DEPTH` | Lists of every stable code, and the ABAC nesting limit. |
 
 **Types**

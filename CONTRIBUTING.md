@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to **useguardril**, a frontend-first, framework-independent authorization SDK (RBAC, ABAC, ReBAC) written in TypeScript. Please read this guide before opening a pull request.
+Thanks for your interest in contributing to **useguardrail**, a frontend-first, framework-independent authorization SDK (RBAC, ABAC, ReBAC) written in TypeScript. Please read this guide before opening a pull request.
 
 ## Code of conduct
 
@@ -17,9 +17,9 @@ This is a `pnpm` workspace:
 
 ```
 packages/
-  core/       # @useguardril/core: engine, RBAC/ABAC/ReBAC evaluators, context, store
-  react/      # @useguardril/react: provider, hooks, <Can>
-  adapters/   # @useguardril/adapters: backend responses -> core contract
+  core/       # @useguardrail/core: engine, RBAC/ABAC/ReBAC evaluators, context, store
+  react/      # @useguardrail/react: provider, hooks, <Can>
+  adapters/   # @useguardrail/adapters: backend responses -> core contract
 ```
 
 Dependencies point one way: `react` and `adapters` depend on `core`; `core` depends on neither. Each package has its own `src/`, `tests/`, `README.md`, and `CHANGELOG.md`.
@@ -28,8 +28,8 @@ Dependencies point one way: `react` and `adapters` depend on `core`; `core` depe
 
 1. **Fork** the repository and clone your fork:
    ```bash
-   git clone git@github.com:<your-username>/useguardril.git
-   cd useguardril
+   git clone git@github.com:<your-username>/useguardrail.git
+   cd useguardrail
    ```
 2. **Install dependencies**:
    ```bash
@@ -79,7 +79,7 @@ pnpm run build       # tsup in every package (core builds first)
 If you change evaluation or store code, also run the benchmarks and compare against the numbers in the root README:
 
 ```bash
-pnpm --filter @useguardril/core run bench
+pnpm --filter @useguardrail/core run bench
 ```
 
 ### Tests
@@ -126,7 +126,7 @@ Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `buil
 Open a GitHub issue with:
 
 - A clear description of the bug or the requested feature.
-- Steps to reproduce (for bugs), including the package name and version, and the Node.js version (and React version, for `@useguardril/react`).
+- Steps to reproduce (for bugs), including the package name and version, and the Node.js version (and React version, for `@useguardrail/react`).
 - Expected vs. actual behavior, ideally with a minimal policy or role set that reproduces it.
 
 Please do not include real credentials or real user data in issues; use synthetic data.

@@ -1,4 +1,4 @@
-import type { Action, Resource } from "@useguardril/core";
+import type { Action, Resource } from "@useguardrail/core";
 import type { ReactElement, ReactNode } from "react";
 import { useAccess } from "../hooks/index.js";
 

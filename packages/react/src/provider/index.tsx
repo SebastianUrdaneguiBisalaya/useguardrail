@@ -1,4 +1,4 @@
-import type { AuthorizationStore, Schema } from "@useguardril/core";
+import type { AuthorizationStore, Schema } from "@useguardrail/core";
 import type { ReactElement, ReactNode } from "react";
 import { createContext, useContext } from "react";
 import { MissingProviderError } from "../errors.js";
@@ -7,7 +7,7 @@ const AuthorizationContext = createContext<AuthorizationStore | null>(null);
 
 /** Props for {@link AuthorizationProvider}. */
 export type AuthorizationProviderProps<S extends Schema = Schema> = {
-  /** The store created with `createAuthorizationStore` from `@useguardril/core`. */
+  /** The store created with `createAuthorizationStore` from `@useguardrail/core`. */
   readonly store: AuthorizationStore<S> | AuthorizationStore;
   readonly children?: ReactNode;
 };

@@ -1,13 +1,13 @@
-# @useguardril/react
+# @useguardrail/react
 
-React adapter for [`@useguardril/core`](../core): a provider, hooks, and a `<Can>` component built on `useSyncExternalStore`, so a component re-renders **only when its own answer changes**.
+React adapter for [`@useguardrail/core`](../core): a provider, hooks, and a `<Can>` component built on `useSyncExternalStore`, so a component re-renders **only when its own answer changes**.
 
 > **Client-side authorization is UX, not security.** Use it to decide what to show or enable. Your backend must always re-enforce every decision.
 
 ## Installation
 
 ```bash
-pnpm add -E @useguardril/core @useguardril/react
+pnpm add -E @useguardrail/core @useguardrail/react
 ```
 
 Requires React 18 or newer. Ships a `"use client"` directive, so it works in Next.js client components.
@@ -15,8 +15,8 @@ Requires React 18 or newer. Ships a `"use client"` directive, so it works in Nex
 ## Usage
 
 ```tsx
-import { createAuthorizationStore, createEngine, createRbacEvaluator } from "@useguardril/core";
-import { AuthorizationProvider, Can, useCan } from "@useguardril/react";
+import { createAuthorizationStore, createEngine, createRbacEvaluator } from "@useguardrail/core";
+import { AuthorizationProvider, Can, useCan } from "@useguardrail/react";
 
 const engine = createEngine({
   evaluators: [
@@ -73,11 +73,11 @@ Types exported for your own wrappers: `AccessState` (`"loading" | "allowed" | "d
 
 ## Typed schema
 
-Bind the provider, `Can`, `useCan`, and `useAccess` to your schema once, and actions and resource types are checked at compile time. Use the same `AppSchema` you gave to `forSchema` from `@useguardril/core`:
+Bind the provider, `Can`, `useCan`, and `useAccess` to your schema once, and actions and resource types are checked at compile time. Use the same `AppSchema` you gave to `forSchema` from `@useguardrail/core`:
 
 ```tsx
 // authorization-ui.ts
-import { forSchema } from "@useguardril/react";
+import { forSchema } from "@useguardrail/react";
 
 type AppSchema = { invoice: "read" | "update" | "delete"; user: "read" | "invite" };
 
@@ -106,8 +106,8 @@ function Example({ id }: { id: string }) {
 Create the store in `"loading"` and fill it with `store.load(...)` (see the [core README](../core/README.md#loading-state-async-data)). Until the data arrives every check is denied, so use `<Can loading>` or `useAccess` to show a skeleton instead of flashing "no access":
 
 ```tsx
-import { createAuthorizationStore } from "@useguardril/core";
-import { Can, useAuthorizationStatus } from "@useguardril/react";
+import { createAuthorizationStore } from "@useguardrail/core";
+import { Can, useAuthorizationStatus } from "@useguardrail/react";
 
 const store = createAuthorizationStore({ engine, status: "loading" });
 void store.load(async ({ signal }) => {
@@ -135,7 +135,7 @@ function InvoiceActions({ id }: { id: string }) {
 `useAccess` gives the same three-way answer as a value:
 
 ```tsx
-import { useAccess } from "@useguardril/react";
+import { useAccess } from "@useguardrail/react";
 
 function InvoicePage({ id }: { id: string }) {
   const access = useAccess("read", { type: "invoice", id });
@@ -151,7 +151,7 @@ Each hook re-renders only when its own value changes, so going from `"loading"` 
 Ask the store why a check came out the way it did, from a component or from the console:
 
 ```tsx
-import { useAuthorizationStore } from "@useguardril/react";
+import { useAuthorizationStore } from "@useguardrail/react";
 
 function DebugInvoice({ id }: { id: string }) {
   const store = useAuthorizationStore(); // does not subscribe, so it never re-renders
@@ -172,8 +172,8 @@ Consequences, and what to do:
 
    ```tsx
    "use client";
-   import { createAuthorizationStore } from "@useguardril/core";
-   import { AuthorizationProvider } from "@useguardril/react";
+   import { createAuthorizationStore } from "@useguardrail/core";
+   import { AuthorizationProvider } from "@useguardrail/react";
    import { useState, type ReactNode } from "react";
 
    export function Providers({ session, children }: { session: Session; children: ReactNode }) {
@@ -201,7 +201,7 @@ Consequences, and what to do:
 
 ## Errors
 
-Using a hook or component outside an `AuthorizationProvider` throws `MissingProviderError`, which extends `AuthorizationError` from `@useguardril/core`.
+Using a hook or component outside an `AuthorizationProvider` throws `MissingProviderError`, which extends `AuthorizationError` from `@useguardrail/core`.
 
 ## License
 

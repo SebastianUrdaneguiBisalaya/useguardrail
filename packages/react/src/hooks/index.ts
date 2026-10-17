@@ -3,8 +3,8 @@ import type {
   AuthorizationStatus,
   Resource,
   Subject,
-} from "@useguardril/core";
-import { evaluateState } from "@useguardril/core";
+} from "@useguardrail/core";
+import { evaluateState } from "@useguardrail/core";
 import { useSyncExternalStore } from "react";
 import { useAuthorizationStore } from "../provider/index.js";
 

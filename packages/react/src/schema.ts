@@ -3,7 +3,7 @@ import type {
   ResourceFor,
   ResourceName,
   Schema,
-} from "@useguardril/core";
+} from "@useguardrail/core";
 import type { ReactElement, ReactNode } from "react";
 import { Can } from "./components/index.js";
 import type { AccessState } from "./hooks/index.js";
@@ -26,7 +26,7 @@ export type SchemaCanProps<S extends Schema, T extends ResourceName<S>> = {
   readonly loading?: ReactNode;
 };
 
-/** The provider, hooks, and `Can` of `@useguardril/react`, bound to one {@link Schema}. */
+/** The provider, hooks, and `Can` of `@useguardrail/react`, bound to one {@link Schema}. */
 export type SchemaKit<S extends Schema> = {
   readonly AuthorizationProvider: (
     props: AuthorizationProviderProps<S>,
@@ -48,7 +48,7 @@ export type SchemaKit<S extends Schema> = {
 /**
  * Binds the provider, `Can`, `useCan`, and `useAccess` to your schema, so actions and resource
  * types are checked at compile time. At runtime these are the very same functions; only the
- * types change. Use the same `AppSchema` you gave to `forSchema` from `@useguardril/core`.
+ * types change. Use the same `AppSchema` you gave to `forSchema` from `@useguardrail/core`.
  *
  * @example
  * type AppSchema = { invoice: "read" | "update"; user: "read" | "invite" };

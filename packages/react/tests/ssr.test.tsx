@@ -1,5 +1,5 @@
 import { act, cleanup } from "@testing-library/react";
-import { createAuthorizationStore } from "@useguardril/core";
+import { createAuthorizationStore } from "@useguardrail/core";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";

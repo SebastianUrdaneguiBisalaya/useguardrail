@@ -1,15 +1,15 @@
-# useguardril
+# useguardrail
 
 A frontend-first, framework-independent authorization SDK for TypeScript. Describe who can do what with **RBAC**, **ABAC**, and **ReBAC**, evaluate it synchronously in the browser or in Node, and keep your UI in sync through a small reactive store.
 
 > **Client-side authorization is UX, not security.** Use it to decide what to show, enable, or route to. Your backend must always re-enforce every decision. These packages hold no secrets and never call a server.
 
-> **Status:** `0.1.x`, published on npm under the `@useguardril` scope. The public API may still change before 1.0; every change is listed in each package's `CHANGELOG.md`.
+> **Status:** `0.1.x`, published on npm under the `@useguardrail` scope. The public API may still change before 1.0; every change is listed in each package's `CHANGELOG.md`.
 
 ## Contents
 
 - [Packages](#packages)
-- [Why useguardril](#why-useguardril)
+- [Why useguardrail](#why-useguardrail)
 - [Concepts](#concepts)
 - [Requirements](#requirements)
 - [Quick start](#quick-start)
@@ -28,11 +28,11 @@ A frontend-first, framework-independent authorization SDK for TypeScript. Descri
 
 | Package | Description |
 |---|---|
-| [`@useguardril/core`](./packages/core) | The engine: RBAC, ABAC, and ReBAC evaluators, multi-tenant context, and a reactive store. No UI dependencies, zero runtime dependencies. |
-| [`@useguardril/react`](./packages/react) | React adapter: `AuthorizationProvider`, `useCan`, `<Can>`. Re-renders a component only when its own answer changes. |
-| [`@useguardril/adapters`](./packages/adapters) | Normalizes backend responses (sessions, roles, OpenFGA and SpiceDB relation tuples) into the core contract. |
+| [`@useguardrail/core`](./packages/core) | The engine: RBAC, ABAC, and ReBAC evaluators, multi-tenant context, and a reactive store. No UI dependencies, zero runtime dependencies. |
+| [`@useguardrail/react`](./packages/react) | React adapter: `AuthorizationProvider`, `useCan`, `<Can>`. Re-renders a component only when its own answer changes. |
+| [`@useguardrail/adapters`](./packages/adapters) | Normalizes backend responses (sessions, roles, OpenFGA and SpiceDB relation tuples) into the core contract. |
 
-## Why useguardril
+## Why useguardrail
 
 - **Three models, one API.** RBAC, ABAC, and ReBAC are pluggable evaluators that compose into a single decision.
 - **Safe by default.** Deny always wins, no opinion means deny, and an evaluator that throws or returns garbage also means deny.
@@ -65,7 +65,7 @@ A frontend-first, framework-independent authorization SDK for TypeScript. Descri
 ## Quick start
 
 ```bash
-pnpm add -E @useguardril/core @useguardril/react
+pnpm add -E @useguardrail/core @useguardrail/react
 ```
 
 ```tsx
@@ -73,8 +73,8 @@ import {
   createAuthorizationStore,
   createEngine,
   createRbacEvaluator,
-} from "@useguardril/core";
-import { AuthorizationProvider, Can, useCan } from "@useguardril/react";
+} from "@useguardrail/core";
+import { AuthorizationProvider, Can, useCan } from "@useguardrail/react";
 
 const engine = createEngine({
   evaluators: [
@@ -112,7 +112,7 @@ export const App = () => (
 );
 ```
 
-Not using React? `@useguardril/core` works on its own:
+Not using React? `@useguardrail/core` works on its own:
 
 ```ts
 store.can("update", { type: "invoice", id: "42" }); // true
@@ -135,8 +135,8 @@ store.setSubject(undefined); // signed out: everything is denied
 Evaluation is synchronous; fetching the data is not. Create the store in `"loading"` and fill it with `store.load(...)`, so the UI shows a skeleton instead of flashing "no access" while the session loads:
 
 ```tsx
-import { createAuthorizationStore } from "@useguardril/core";
-import { Can } from "@useguardril/react";
+import { createAuthorizationStore } from "@useguardrail/core";
+import { Can } from "@useguardrail/react";
 
 const store = createAuthorizationStore({ engine, status: "loading" });
 
@@ -163,7 +163,7 @@ void store.load(async ({ signal }) => {
 **Tenants.** The tenant always travels in `context.tenantId`. For ReBAC, `createTenantRelationGraph` gives each tenant its own graph, and the evaluator picks it by `context.tenantId`, so a relation in one tenant can never grant access in another, even when their references look alike. With no tenant, or an unknown one, the evaluator has no opinion and the result is `deny`.
 
 ```ts
-import { createRebacEvaluator, createTenantRelationGraph } from "@useguardril/core";
+import { createRebacEvaluator, createTenantRelationGraph } from "@useguardrail/core";
 
 const graph = createTenantRelationGraph({
   tuples: {
@@ -234,7 +234,7 @@ store.setContext({ tenantId: "globex" });
 An ABAC policy compares a subject field with a resource field:
 
 ```ts
-import { createAbacEvaluator } from "@useguardril/core";
+import { createAbacEvaluator } from "@useguardrail/core";
 
 const ownership = createAbacEvaluator({
   policies: [
@@ -257,7 +257,7 @@ store.can("update", { type: "post", id: "9", attributes: { authorId: "user:ana" 
 Put the plan or flag in the context and test it in a policy:
 
 ```ts
-import { createAbacEvaluator } from "@useguardril/core";
+import { createAbacEvaluator } from "@useguardrail/core";
 
 const flags = createAbacEvaluator({
   policies: [
@@ -277,7 +277,7 @@ store.setContext({ tenantId: "acme", attributes: { plan: "pro" } });
 ### Hide, disable, or show a placeholder
 
 ```tsx
-import { Can, useAccess, useCan } from "@useguardril/react";
+import { Can, useAccess, useCan } from "@useguardrail/react";
 
 function InvoiceRow({ id }: { id: string }) {
   const invoice = { type: "invoice", id };
@@ -337,7 +337,7 @@ store.subscribeSelector(
 Rules are plain data, so they are easy to test without a UI:
 
 ```ts
-import { createEngine, createRbacEvaluator } from "@useguardril/core";
+import { createEngine, createRbacEvaluator } from "@useguardrail/core";
 import { expect, it } from "vitest";
 
 it("viewers cannot update invoices", () => {
@@ -360,7 +360,7 @@ it("viewers cannot update invoices", () => {
 
 ### Load roles and relations from your backend
 
-Use the adapters to turn whatever your API returns into the shapes above: see [`@useguardril/adapters`](./packages/adapters).
+Use the adapters to turn whatever your API returns into the shapes above: see [`@useguardrail/adapters`](./packages/adapters).
 
 ## Typed actions and resources
 
@@ -368,7 +368,7 @@ By default actions and resource types are plain strings. Declare a **schema** an
 
 ```ts
 // authorization.ts
-import { forSchema } from "@useguardril/core";
+import { forSchema } from "@useguardrail/core";
 
 // Resource type -> the actions it supports. Declare it with `type`, not `interface`.
 type AppSchema = {
@@ -409,7 +409,7 @@ For React, bind the components once and import them from your own module:
 
 ```tsx
 // authorization-ui.ts
-import { forSchema } from "@useguardril/react";
+import { forSchema } from "@useguardrail/react";
 import type { AppSchema } from "./authorization";
 
 export const { AuthorizationProvider, Can, useCan, useAccess } = forSchema<AppSchema>();
@@ -428,7 +428,7 @@ What is checked:
 | ABAC `actions` / `resources` | Declared actions and resource types (or `"*"`) |
 | ReBAC `requirements` | Declared resource types, each with only its own actions |
 | `store.can` / `store.evaluate` / `engine.evaluate` | An action must belong to the resource type it is paired with |
-| `useCan` / `useAccess` / `<Can>` | Same, through `forSchema` from `@useguardril/react` |
+| `useCan` / `useAccess` / `<Can>` | Same, through `forSchema` from `@useguardrail/react` |
 
 Good to know:
 
@@ -465,7 +465,7 @@ Evaluation stops at the first evaluator that denies, throws, or misbehaves, so l
 **Seeing every decision.** `onDecision` is called after each one. Turn it on only where you want it:
 
 ```ts
-import { createAuthorizationStore, createEngine } from "@useguardril/core";
+import { createAuthorizationStore, createEngine } from "@useguardrail/core";
 
 const engine = createEngine({
   evaluators,
@@ -563,7 +563,7 @@ All of these extend `AuthorizationError`, so one `instanceof` check catches them
 `message` (on errors) and `reason` (on decisions) are always in English. For any other language, use the stable `code` and `params` that come with every error and every built-in decision, and format the text yourself, with your own i18n library or a plain object:
 
 ```ts
-import { AuthorizationError, createRbacEvaluator, type ErrorCode } from "@useguardril/core";
+import { AuthorizationError, createRbacEvaluator, type ErrorCode } from "@useguardrail/core";
 
 const es: Partial<Record<ErrorCode, (p: Record<string, unknown>) => string>> = {
   ROLE_INHERITANCE_CYCLE: (p) => `Ciclo de herencia de roles: ${(p.cycle as string[]).join(" -> ")}.`,
@@ -668,7 +668,7 @@ What this means:
 Reproduce with:
 
 ```bash
-pnpm --filter @useguardril/core run bench
+pnpm --filter @useguardrail/core run bench
 ```
 
 ## Contributing

@@ -4,7 +4,7 @@ import {
   createRbacEvaluator,
   createRebacEvaluator,
   createRelationGraph,
-} from "@useguardril/core";
+} from "@useguardrail/core";
 import { describe, expect, it } from "vitest";
 import {
   createRolesAdapter,

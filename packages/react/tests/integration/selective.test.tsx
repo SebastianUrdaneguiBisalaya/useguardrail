@@ -4,7 +4,7 @@ import {
   createAuthorizationStore,
   createEngine,
   createRbacEvaluator,
-} from "@useguardril/core";
+} from "@useguardrail/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { AuthorizationProvider, useCan } from "../../src/index.js";
 

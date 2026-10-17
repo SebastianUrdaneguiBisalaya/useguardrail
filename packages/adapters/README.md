@@ -1,18 +1,18 @@
-# @useguardril/adapters
+# @useguardrail/adapters
 
-Adapters that normalize backend responses into the [`@useguardril/core`](../core) contract, so the engine never has to know what your API looks like.
+Adapters that normalize backend responses into the [`@useguardrail/core`](../core) contract, so the engine never has to know what your API looks like.
 
 > **Client-side authorization is UX, not security.** Your backend must always re-enforce every decision.
 
 ## Installation
 
 ```bash
-pnpm add -E @useguardril/core @useguardril/adapters
+pnpm add -E @useguardrail/core @useguardrail/adapters
 ```
 
 ## What is an adapter?
 
-An `Adapter<T>` is a pure function `(response: unknown) => T`. It never mutates the response and throws `AdapterMappingError` (from `@useguardril/core`) when the response does not have the expected shape. Error messages name **paths**, never response values, so they are safe to log.
+An `Adapter<T>` is a pure function `(response: unknown) => T`. It never mutates the response and throws `AdapterMappingError` (from `@useguardrail/core`) when the response does not have the expected shape. Error messages name **paths**, never response values, so they are safe to log.
 
 Adapters are configured with dot paths (`"user.profile.id"`). Paths read own properties only and reject `__proto__`, `constructor`, and `prototype`.
 
@@ -21,8 +21,8 @@ Adapters are configured with dot paths (`"user.profile.id"`). Paths read own pro
 Turns a "who am I" response into a `Subject` and a `Context`.
 
 ```ts
-import { createAuthorizationStore } from "@useguardril/core";
-import { createSessionAdapter } from "@useguardril/adapters";
+import { createAuthorizationStore } from "@useguardrail/core";
+import { createSessionAdapter } from "@useguardrail/adapters";
 
 const adaptSession = createSessionAdapter({
   subjectId: "user.id", // string or number
@@ -43,8 +43,8 @@ The user id is required. If `tenantId` is configured and missing, it throws inst
 Turns a roles response into the `roles` object for `createRbacEvaluator`.
 
 ```ts
-import { createRbacEvaluator } from "@useguardril/core";
-import { createRolesAdapter } from "@useguardril/adapters";
+import { createRbacEvaluator } from "@useguardrail/core";
+import { createRolesAdapter } from "@useguardrail/adapters";
 
 const adaptRoles = createRolesAdapter({
   list: "data.roles", // omit when the response is the array itself
@@ -67,8 +67,8 @@ For `createRelationGraph` (ReBAC):
 | `spiceDbTuplesAdapter` | SpiceDB `ReadRelationships` output: an array, `{ relationships }`, or streamed `{ result: { relationship } }`. |
 
 ```ts
-import { createRelationGraph } from "@useguardril/core";
-import { openFgaTuplesAdapter } from "@useguardril/adapters";
+import { createRelationGraph } from "@useguardrail/core";
+import { openFgaTuplesAdapter } from "@useguardrail/adapters";
 
 const graph = createRelationGraph({ tuples: openFgaTuplesAdapter(await readTuples()) });
 ```
@@ -86,16 +86,16 @@ Userset subjects (`"team:eng#member"`) and wildcard subjects (`"user:*"`, public
 | `Adapter<T>` | `(response: unknown) => T`: the shape of every adapter, and of your own. |
 | `Session` | What the session adapter returns: `{ subject: Subject; context: Context }`. |
 
-Every adapter throws `AdapterMappingError` (exported by `@useguardril/core`, with a stable `code` and `params`) when the response does not have the expected shape.
+Every adapter throws `AdapterMappingError` (exported by `@useguardrail/core`, with a stable `code` and `params`) when the response does not have the expected shape.
 
 ## Writing your own
 
 Any function with the right shape is an adapter:
 
 ```ts
-import { AdapterMappingError } from "@useguardril/core";
-import type { RoleDefinition } from "@useguardril/core";
-import type { Adapter } from "@useguardril/adapters";
+import { AdapterMappingError } from "@useguardrail/core";
+import type { RoleDefinition } from "@useguardrail/core";
+import type { Adapter } from "@useguardrail/adapters";
 
 // A legacy API answering { "admin": ["invoice:*"], "viewer": ["invoice:read"] }
 const legacyRoles: Adapter<Record<string, RoleDefinition>> = (response) => {

@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import type { StoreDecisionEvent } from "@useguardril/core";
-import { createAuthorizationStore } from "@useguardril/core";
+import type { StoreDecisionEvent } from "@useguardrail/core";
+import { createAuthorizationStore } from "@useguardrail/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { AuthorizationProvider, Can, useCan } from "../src/index.js";
 import { engine } from "./setup.js";

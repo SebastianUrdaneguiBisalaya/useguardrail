@@ -13,7 +13,7 @@ import type {
 import { createAuthorizationStore } from "./store/authorization.js";
 import type { Evaluator, Schema } from "./types/index.js";
 
-/** The factories of `@useguardril/core`, bound to one {@link Schema}. */
+/** The factories of `@useguardrail/core`, bound to one {@link Schema}. */
 export type SchemaKit<S extends Schema> = {
   readonly createEngine: (config: EngineConfig<S>) => Engine<S>;
   readonly createRbacEvaluator: (config: RbacConfig<S>) => Evaluator<S>;

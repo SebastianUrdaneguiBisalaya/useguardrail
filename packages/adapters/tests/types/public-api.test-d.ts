@@ -1,5 +1,5 @@
 /**
- * Type-level tests for the public API of @useguardril/adapters. Nothing here runs:
+ * Type-level tests for the public API of @useguardrail/adapters. Nothing here runs:
  * `pnpm run typecheck` (tsc) fails if the declared contract changes.
  */
 import type {
@@ -7,7 +7,7 @@ import type {
   RelationTuple,
   RoleDefinition,
   Subject,
-} from "@useguardril/core";
+} from "@useguardrail/core";
 import { expectTypeOf } from "vitest";
 import type {
   Adapter,

@@ -1,5 +1,5 @@
-import type { RoleDefinition } from "@useguardril/core";
-import { AdapterMappingError } from "@useguardril/core";
+import type { RoleDefinition } from "@useguardrail/core";
+import { AdapterMappingError } from "@useguardrail/core";
 import { compilePath, readList, readPath, toIdentifier } from "./path.js";
 import type { Adapter } from "./types.js";
 

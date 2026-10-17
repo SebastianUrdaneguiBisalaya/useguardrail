@@ -70,10 +70,10 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Use React 18
-        run: pnpm --filter @useguardril/react add -D -E react@18.3.1 react-dom@18.3.1 @types/react@18 @types/react-dom@18
+        run: pnpm --filter @useguardrail/react add -D -E react@18.3.1 react-dom@18.3.1 @types/react@18 @types/react-dom@18
 
       - name: Typecheck
-        run: pnpm --filter @useguardril/react run typecheck
+        run: pnpm --filter @useguardrail/react run typecheck
 
       - name: Test
-        run: pnpm --filter @useguardril/react run test
+        run: pnpm --filter @useguardrail/react run test

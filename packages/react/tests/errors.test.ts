@@ -1,4 +1,4 @@
-import { AuthorizationError } from "@useguardril/core";
+import { AuthorizationError } from "@useguardrail/core";
 import { describe, expect, it } from "vitest";
 import { MissingProviderError } from "../src/index.js";
 

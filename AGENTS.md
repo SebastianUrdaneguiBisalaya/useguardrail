@@ -2,7 +2,7 @@
 
 Standards and best practices for building, maintaining, and publishing a Node.js library written in TypeScript, bundled with `tsup`, and distributed on npm.
 
-This repository started from a Node.js + TypeScript + tsup library template. Sections 1-9 below are the generic standards it follows. The final section, "Project context: `useguardril`," specializes them for this project — a frontend-first, framework-agnostic authorization SDK (RBAC, ReBAC, ABAC) — and takes precedence over the generic sections where they conflict (e.g. the server-side-only rules in section 6 do not apply).
+This repository started from a Node.js + TypeScript + tsup library template. Sections 1-9 below are the generic standards it follows. The final section, "Project context: `useguardrail`," specializes them for this project — a frontend-first, framework-agnostic authorization SDK (RBAC, ReBAC, ABAC) — and takes precedence over the generic sections where they conflict (e.g. the server-side-only rules in section 6 do not apply).
 
 ## 1. Project structure
 
@@ -158,9 +158,9 @@ pnpm-workspace.yaml
 
 ---
 
-# Project context: `useguardril` — frontend-first authorization SDK
+# Project context: `useguardrail` — frontend-first authorization SDK
 
-`useguardril` is a framework-agnostic, frontend-first authorization SDK. It evaluates permissions on the client (UI gating, route guards, feature flags) and is designed to support **RBAC**, **ReBAC**, and **ABAC** models behind a single evaluation API. It is a `pnpm` monorepo (see section 9).
+`useguardrail` is a framework-agnostic, frontend-first authorization SDK. It evaluates permissions on the client (UI gating, route guards, feature flags) and is designed to support **RBAC**, **ReBAC**, and **ABAC** models behind a single evaluation API. It is a `pnpm` monorepo (see section 9).
 
 ## 0. Target environment (section 8)
 
@@ -174,7 +174,7 @@ Adapted to the existing repo (`packages/*` in `pnpm-workspace.yaml`):
 
 ```
 packages/
-  core/                   # @useguardril/core — framework-independent engine
+  core/                   # @useguardrail/core — framework-independent engine
     src/
       index.ts            # barrel file — only public surface
       engine/             # evaluate(), decision pipeline
@@ -185,29 +185,29 @@ packages/
       types/              # shared public types
       errors.ts           # typed error classes
     tests/                # mirrors src/ (+ tests/performance/ benchmarks)
-  react/                  # @useguardril/react — React adapter
+  react/                  # @useguardrail/react — React adapter
     src/
       index.ts
       provider/           # AuthorizationProvider
       hooks/              # useCan(), ...
       components/         # <Can>
     tests/                # mirrors src/ (+ tests/integration/ for core + react)
-  adapters/               # @useguardril/adapters — backend response -> SDK contract
+  adapters/               # @useguardrail/adapters — backend response -> SDK contract
     src/
       index.ts
       mapping/            # path helpers, session/roles/tuples adapters
     tests/                # mirrors src/ (+ tests/integration/ for adapters + core)
 ```
 
-- Per-package `tests/` mirror `src/` (section 1). There is no root `tests/`: each package owns its vitest config, so cross-package integration tests live in the consuming package (`packages/react/tests/integration/`, which resolves `@useguardril/core` to its source) and benchmarks live next to the code they measure (`packages/core/tests/performance/`, run with `pnpm --filter @useguardril/core run bench`).
+- Per-package `tests/` mirror `src/` (section 1). There is no root `tests/`: each package owns its vitest config, so cross-package integration tests live in the consuming package (`packages/react/tests/integration/`, which resolves `@useguardrail/core` to its source) and benchmarks live next to the code they measure (`packages/core/tests/performance/`, run with `pnpm --filter @useguardrail/core run bench`).
 - `biome.json` lives at the repo root; each package owns its own `tsconfig.base.json` (extended by its `tsconfig.json`) and `vitest.config.ts`.
 - Start with these three packages. Each ships its own unit tests; `core` + `react` also get integration tests. There is no separate testing package: test factories and fixtures live in each package's `tests/`.
 
 ## 2. Package responsibilities
 
 - **`core`**: permission evaluation, relations, rules, multi-tenant context, and a reactive store. **No UI or framework dependency, zero runtime dependencies.** Only package that defines the engine, shared types, and error classes.
-- **`react`**: `AuthorizationProvider`, hooks such as `useCan()`, and components such as `<Can>`. Peer-depends on `@useguardril/core` and `react`. Subscribes through `useSyncExternalStore` with selective subscriptions to minimize re-renders.
-- **`adapters`**: transforms responses from different backends into the SDK's common contract. Peer-depends on `@useguardril/core` (types only where possible).
+- **`react`**: `AuthorizationProvider`, hooks such as `useCan()`, and components such as `<Can>`. Peer-depends on `@useguardrail/core` and `react`. Subscribes through `useSyncExternalStore` with selective subscriptions to minimize re-renders.
+- **`adapters`**: transforms responses from different backends into the SDK's common contract. Peer-depends on `@useguardrail/core` (types only where possible).
 
 Dependency direction is one-way: `react`, `adapters` → `core`. `core` never imports from either, and they never import from each other.
 

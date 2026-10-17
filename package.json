@@ -1,7 +1,7 @@
 {
-  "name": "useguardril",
+  "name": "useguardrail",
   "version": "0.0.0",
-  "description": "Monorepo workspace root: useguardril, a frontend-first authorization SDK (packages/*).",
+  "description": "Monorepo workspace root: useguardrail, a frontend-first authorization SDK (packages/*).",
   "license": "ISC",
   "author": {
     "name": "Sebastian Marat Urdanegui Bisalaya",

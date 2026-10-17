@@ -1,4 +1,4 @@
-import { AdapterMappingError } from "@useguardril/core";
+import { AdapterMappingError } from "@useguardrail/core";
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {

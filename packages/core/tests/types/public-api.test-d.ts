@@ -1,5 +1,5 @@
 /**
- * Type-level tests for the public API of @useguardril/core.
+ * Type-level tests for the public API of @useguardrail/core.
  *
  * Nothing here runs: `pnpm run typecheck` (tsc) fails if the declared contract changes, so a
  * breaking change to the published `.d.ts` can't slip in unnoticed.

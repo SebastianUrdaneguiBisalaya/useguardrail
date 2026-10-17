@@ -1,5 +1,5 @@
 /**
- * Type-level tests for the public API of @useguardril/react. Nothing here runs:
+ * Type-level tests for the public API of @useguardrail/react. Nothing here runs:
  * `pnpm run typecheck` (tsc) fails if the declared contract changes.
  */
 import type {
@@ -10,7 +10,7 @@ import type {
   ErrorCode,
   Resource,
   Subject,
-} from "@useguardril/core";
+} from "@useguardrail/core";
 import type { ReactElement, ReactNode } from "react";
 import { expectTypeOf } from "vitest";
 import type {

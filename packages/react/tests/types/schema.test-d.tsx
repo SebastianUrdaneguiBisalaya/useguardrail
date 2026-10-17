@@ -1,9 +1,9 @@
 /**
- * Type-level tests for `forSchema<S>()` in @useguardril/react. Nothing here runs:
+ * Type-level tests for `forSchema<S>()` in @useguardrail/react. Nothing here runs:
  * `pnpm run typecheck` fails if the typing regresses.
  */
-import type { AuthorizationStore } from "@useguardril/core";
-import { forSchema as coreForSchema } from "@useguardril/core";
+import type { AuthorizationStore } from "@useguardrail/core";
+import { forSchema as coreForSchema } from "@useguardrail/core";
 import { expectTypeOf } from "vitest";
 import type { AccessState } from "../../src/index.js";
 import {

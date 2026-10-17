@@ -1,7 +1,7 @@
 import type { MessageParams } from "./types/index.js";
 
 /**
- * Every stable error `code` the SDK can produce, across all `@useguardril/*` packages.
+ * Every stable error `code` the SDK can produce, across all `@useguardrail/*` packages.
  * Codes never change meaning, so you can translate them with your own i18n catalog:
  * look up `error.code` and fill in `error.params`.
  */
@@ -63,9 +63,9 @@ export const ERROR_CODES = [
   "REBAC_REQUIREMENTS_INVALID",
   "REBAC_REQUIREMENT_TYPE_INVALID",
   "REBAC_REQUIREMENT_INVALID",
-  // @useguardril/react.
+  // @useguardrail/react.
   "PROVIDER_MISSING",
-  // @useguardril/adapters.
+  // @useguardrail/adapters.
   "ADAPTER_PATH_INVALID",
   "ADAPTER_LIST_NOT_ARRAY",
   "ADAPTER_STRING_LIST_INVALID",
@@ -96,7 +96,7 @@ export type ErrorDetails = {
 };
 
 /**
- * Base class for every error thrown by `@useguardril/*`. Use `instanceof` to narrow, and
+ * Base class for every error thrown by `@useguardrail/*`. Use `instanceof` to narrow, and
  * `code` + `params` to show a message in your own language. `message` is always English.
  */
 export class AuthorizationError extends Error {
