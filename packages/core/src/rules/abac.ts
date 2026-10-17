@@ -59,6 +59,7 @@ const OPERATORS: ReadonlySet<string> = new Set([
   "contains",
   "exists",
 ]);
+const MAX_SCOPE_CACHE_ENTRIES = 1024;
 const ROOTS: ReadonlySet<string> = new Set([
   "subject",
   "action",
@@ -254,15 +255,29 @@ export function createAbacEvaluator(config: AbacConfig): Evaluator {
     };
   });
 
+  // Policies whose scope matches an (action, resource type) pair, in declaration order,
+  // memoized so evaluation only runs conditions for policies that can apply. Bounded so
+  // arbitrary action/type strings cannot grow it without limit.
+  const scopeCache = new Map<string, readonly (typeof compiled)[number][]>();
+  const candidatesFor = (action: string, type: string) => {
+    const key = `${action}\u0000${type}`;
+    let candidates = scopeCache.get(key);
+    if (candidates === undefined) {
+      candidates = compiled.filter(
+        (policy) =>
+          policy.matchesAction(action) && policy.matchesResource(type),
+      );
+      if (scopeCache.size >= MAX_SCOPE_CACHE_ENTRIES) {
+        scopeCache.clear();
+      }
+      scopeCache.set(key, candidates);
+    }
+    return candidates;
+  };
+
   return (input) => {
     let allowedBy: string | undefined;
-    for (const policy of compiled) {
-      if (
-        !policy.matchesAction(input.action) ||
-        !policy.matchesResource(input.resource.type)
-      ) {
-        continue;
-      }
+    for (const policy of candidatesFor(input.action, input.resource.type)) {
       if (!policy.checks.every((check) => check(input))) {
         continue;
       }

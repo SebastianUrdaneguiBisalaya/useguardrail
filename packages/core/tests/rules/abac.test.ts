@@ -269,6 +269,24 @@ describe("createAbacEvaluator", () => {
     expect(e(input())).toBeUndefined();
   });
 
+  it("default-denies through the engine when no policy matches", () => {
+    const e = evaluator({
+      actions: [
+        "delete",
+      ],
+      effect: "allow",
+      id: "only-delete",
+    });
+    expect(e(input())).toBeUndefined();
+    expect(
+      createEngine({
+        evaluators: [
+          e,
+        ],
+      }).evaluate(input()).effect,
+    ).toBe("deny");
+  });
+
   it("deny wins over allow within the evaluator, and via the engine", () => {
     const e = evaluator(
       {
@@ -313,6 +331,88 @@ describe("createAbacEvaluator", () => {
       id: "p",
     });
     expect(e(input())).toBeUndefined();
+  });
+
+  it("scopes policies by action and resource type, keeping declaration order", () => {
+    const e = evaluator(
+      {
+        effect: "allow",
+        id: "first-any",
+      },
+      {
+        actions: [
+          "read",
+        ],
+        effect: "allow",
+        id: "read-only",
+        resources: [
+          "invoice",
+        ],
+      },
+      {
+        actions: [
+          "delete",
+        ],
+        effect: "deny",
+        id: "delete-deny",
+        resources: [
+          "invoice",
+        ],
+      },
+      {
+        effect: "deny",
+        id: "other-type",
+        resources: [
+          "user",
+        ],
+      },
+    );
+    expect(e(input())).toEqual({
+      effect: "allow",
+      reason: 'Policy "first-any" allows access.',
+    });
+    expect(
+      e(
+        input({
+          action: "delete",
+        }),
+      ),
+    ).toEqual({
+      effect: "deny",
+      reason: 'Policy "delete-deny" denies access.',
+    });
+    expect(
+      e(
+        input({
+          resource: {
+            type: "user",
+          },
+        }),
+      )?.effect,
+    ).toBe("deny");
+  });
+
+  it("stays correct past the internal scope-cache limit", () => {
+    const e = evaluator({
+      actions: [
+        "read",
+      ],
+      effect: "allow",
+      id: "read-invoice",
+      resources: [
+        "invoice",
+      ],
+    });
+    for (let i = 0; i < 3_000; i += 1) {
+      expect(
+        e(
+          input({
+            action: `noise-${i}`,
+          }),
+        ),
+      ).toBeUndefined();
+    }
+    expect(e(input())?.effect).toBe("allow");
   });
 
   it("rejects malformed policies", () => {
