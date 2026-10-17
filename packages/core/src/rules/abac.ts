@@ -113,12 +113,22 @@ const compare = (
   }
 };
 
-const compilePath = (path: unknown, where: string): readonly string[] => {
+const clip = (value: unknown): string => String(value).slice(0, 64);
+
+const compilePath = (path: unknown, policyId: string): readonly string[] => {
+  const where = `Policy "${policyId}"`;
   const segments = parsePath(path);
   const root = segments?.[0];
   if (!segments || root === undefined || !ROOTS.has(root)) {
     throw new InvalidPolicyError(
-      `${where}: invalid field path "${String(path)}"; it must start with subject, action, resource or context.`,
+      `${where}: invalid field path "${clip(path)}"; it must start with subject, action, resource or context.`,
+      {
+        code: "CONDITION_FIELD_INVALID",
+        params: {
+          field: clip(path),
+          policyId,
+        },
+      },
     );
   }
   return segments;
@@ -126,22 +136,40 @@ const compilePath = (path: unknown, where: string): readonly string[] => {
 
 type Check = (input: EvaluationInput) => boolean;
 
-const compileCondition = (condition: Condition, where: string): Check => {
+const compileCondition = (condition: Condition, policyId: string): Check => {
+  const where = `Policy "${policyId}"`;
   const candidate = condition as Partial<Condition> | null;
   if (typeof candidate !== "object" || candidate === null) {
-    throw new InvalidPolicyError(`${where}: condition must be an object.`);
+    throw new InvalidPolicyError(`${where}: condition must be an object.`, {
+      code: "CONDITION_NOT_OBJECT",
+      params: {
+        policyId,
+      },
+    });
   }
   const { op, value, valueFrom } = candidate;
   if (typeof op !== "string" || !OPERATORS.has(op)) {
-    throw new InvalidPolicyError(`${where}: unknown operator "${String(op)}".`);
+    throw new InvalidPolicyError(`${where}: unknown operator "${clip(op)}".`, {
+      code: "CONDITION_OPERATOR_UNKNOWN",
+      params: {
+        operator: clip(op),
+        policyId,
+      },
+    });
   }
   const operator = op as ConditionOperator;
-  const field = compilePath(candidate.field, where);
+  const field = compilePath(candidate.field, policyId);
 
   if (operator === "exists") {
     if (typeof value !== "boolean" || valueFrom !== undefined) {
       throw new InvalidPolicyError(
         `${where}: "exists" requires a boolean \`value\` and no \`valueFrom\`.`,
+        {
+          code: "CONDITION_EXISTS_INVALID",
+          params: {
+            policyId,
+          },
+        },
       );
     }
     return (input) => (readPath(input, field) !== undefined) === value;
@@ -150,16 +178,29 @@ const compileCondition = (condition: Condition, where: string): Check => {
   if ((value === undefined) === (valueFrom === undefined)) {
     throw new InvalidPolicyError(
       `${where}: provide exactly one of \`value\` or \`valueFrom\`.`,
+      {
+        code: "CONDITION_VALUE_SOURCE_INVALID",
+        params: {
+          policyId,
+        },
+      },
     );
   }
   if (valueFrom !== undefined) {
-    const other = compilePath(valueFrom, where);
+    const other = compilePath(valueFrom, policyId);
     return (input) =>
       compare(operator, readPath(input, field), readPath(input, other));
   }
   if ((operator === "in" || operator === "nin") && !Array.isArray(value)) {
     throw new InvalidPolicyError(
       `${where}: "${operator}" requires an array \`value\`.`,
+      {
+        code: "CONDITION_ARRAY_REQUIRED",
+        params: {
+          operator,
+          policyId,
+        },
+      },
     );
   }
   return (input) => compare(operator, readPath(input, field), value);
@@ -168,8 +209,9 @@ const compileCondition = (condition: Condition, where: string): Check => {
 const compileScope = (
   scope: unknown,
   label: string,
-  where: string,
+  policyId: string,
 ): ((value: string) => boolean) => {
+  const where = `Policy "${policyId}"`;
   if (scope === undefined) {
     return () => true;
   }
@@ -179,6 +221,13 @@ const compileScope = (
   ) {
     throw new InvalidPolicyError(
       `${where}: \`${label}\` must be an array of non-empty strings.`,
+      {
+        code: "POLICY_SCOPE_INVALID",
+        params: {
+          option: label,
+          policyId,
+        },
+      },
     );
   }
   const values = new Set<string>(scope);
@@ -212,48 +261,87 @@ export function createAbacEvaluator(config: AbacConfig): Evaluator {
   if (!Array.isArray(rawPolicies)) {
     throw new InvalidPolicyError(
       "ABAC config requires `policies` to be an array.",
+      {
+        code: "ABAC_POLICIES_INVALID",
+      },
     );
   }
 
   const ids = new Set<string>();
-  const compiled = rawPolicies.map((policy: Partial<AbacPolicy> | null) => {
-    if (typeof policy !== "object" || policy === null) {
-      throw new InvalidPolicyError("Each policy must be an object.");
-    }
-    const { id, effect } = policy;
-    if (typeof id !== "string" || id === "") {
-      throw new InvalidPolicyError(
-        "Each policy requires a non-empty string `id`.",
+  const compiled = rawPolicies.map(
+    (policy: Partial<AbacPolicy> | null, index: number) => {
+      if (typeof policy !== "object" || policy === null) {
+        throw new InvalidPolicyError(
+          `Policy at index ${index} must be an object.`,
+          {
+            code: "POLICY_NOT_OBJECT",
+            params: {
+              index,
+            },
+          },
+        );
+      }
+      const { id, effect } = policy;
+      if (typeof id !== "string" || id === "") {
+        throw new InvalidPolicyError(
+          `Policy at index ${index} requires a non-empty string \`id\`.`,
+          {
+            code: "POLICY_ID_INVALID",
+            params: {
+              index,
+            },
+          },
+        );
+      }
+      if (ids.has(id)) {
+        throw new InvalidPolicyError(`Duplicate policy id "${id}".`, {
+          code: "POLICY_ID_DUPLICATE",
+          params: {
+            policyId: id,
+          },
+        });
+      }
+      ids.add(id);
+      const where = `Policy "${id}"`;
+      if (effect !== "allow" && effect !== "deny") {
+        throw new InvalidPolicyError(
+          `${where}: \`effect\` must be "allow" or "deny".`,
+          {
+            code: "POLICY_EFFECT_INVALID",
+            params: {
+              policyId: id,
+            },
+          },
+        );
+      }
+      if (
+        policy.conditions !== undefined &&
+        !Array.isArray(policy.conditions)
+      ) {
+        throw new InvalidPolicyError(
+          `${where}: \`conditions\` must be an array.`,
+          {
+            code: "POLICY_CONDITIONS_INVALID",
+            params: {
+              policyId: id,
+            },
+          },
+        );
+      }
+      const matchesAction = compileScope(policy.actions, "actions", id);
+      const matchesResource = compileScope(policy.resources, "resources", id);
+      const checks = (policy.conditions ?? []).map((condition) =>
+        compileCondition(condition, id),
       );
-    }
-    if (ids.has(id)) {
-      throw new InvalidPolicyError(`Duplicate policy id "${id}".`);
-    }
-    ids.add(id);
-    const where = `Policy "${id}"`;
-    if (effect !== "allow" && effect !== "deny") {
-      throw new InvalidPolicyError(
-        `${where}: \`effect\` must be "allow" or "deny".`,
-      );
-    }
-    if (policy.conditions !== undefined && !Array.isArray(policy.conditions)) {
-      throw new InvalidPolicyError(
-        `${where}: \`conditions\` must be an array.`,
-      );
-    }
-    const matchesAction = compileScope(policy.actions, "actions", where);
-    const matchesResource = compileScope(policy.resources, "resources", where);
-    const checks = (policy.conditions ?? []).map((condition) =>
-      compileCondition(condition, where),
-    );
-    return {
-      checks,
-      effect,
-      id,
-      matchesAction,
-      matchesResource,
-    };
-  });
+      return {
+        checks,
+        effect,
+        id,
+        matchesAction,
+        matchesResource,
+      };
+    },
+  );
 
   // Policies whose scope matches an (action, resource type) pair, in declaration order,
   // memoized so evaluation only runs conditions for policies that can apply. Bounded so
@@ -283,7 +371,11 @@ export function createAbacEvaluator(config: AbacConfig): Evaluator {
       }
       if (policy.effect === "deny") {
         return {
+          code: "POLICY_DENIES",
           effect: "deny",
+          params: {
+            policyId: policy.id,
+          },
           reason: `Policy "${policy.id}" denies access.`,
         };
       }
@@ -292,7 +384,11 @@ export function createAbacEvaluator(config: AbacConfig): Evaluator {
     return allowedBy === undefined
       ? undefined
       : {
+          code: "POLICY_ALLOWS",
           effect: "allow",
+          params: {
+            policyId: allowedBy,
+          },
           reason: `Policy "${allowedBy}" allows access.`,
         };
   };

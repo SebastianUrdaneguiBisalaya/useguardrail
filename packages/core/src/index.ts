@@ -1,9 +1,11 @@
 export { createContext } from "./context/index.js";
 export type { Engine, EngineConfig } from "./engine/index.js";
 export { createEngine } from "./engine/index.js";
+export type { ErrorCode, ErrorDetails } from "./errors.js";
 export {
   AdapterMappingError,
   AuthorizationError,
+  ERROR_CODES,
   InvalidContextError,
   InvalidPolicyError,
 } from "./errors.js";
@@ -41,9 +43,12 @@ export type {
   Attributes,
   Context,
   Decision,
+  DecisionCode,
   DecisionEffect,
   EvaluationInput,
   Evaluator,
+  MessageParams,
   Resource,
   Subject,
 } from "./types/index.js";
+export { DECISION_CODES } from "./types/index.js";

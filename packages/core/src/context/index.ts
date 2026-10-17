@@ -1,4 +1,5 @@
 import { InvalidContextError } from "../errors.js";
+import { ownProperty } from "../own.js";
 import type { Attributes, Context } from "../types/index.js";
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -15,12 +16,12 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  */
 export function createContext(input: Context = {}): Context {
   if (!isPlainObject(input)) {
-    throw new InvalidContextError("Context must be an object.");
+    throw new InvalidContextError("Context must be an object.", {
+      code: "CONTEXT_NOT_OBJECT",
+    });
   }
-  const { attributes, tenantId } = input as {
-    attributes?: unknown;
-    tenantId?: unknown;
-  };
+  const attributes = ownProperty(input, "attributes");
+  const tenantId = ownProperty(input, "tenantId");
 
   const context: {
     attributes?: Attributes;
@@ -30,13 +31,18 @@ export function createContext(input: Context = {}): Context {
     if (typeof tenantId !== "string" || tenantId === "") {
       throw new InvalidContextError(
         "Context `tenantId` must be a non-empty string.",
+        {
+          code: "CONTEXT_TENANT_ID_INVALID",
+        },
       );
     }
     context.tenantId = tenantId;
   }
   if (attributes !== undefined) {
     if (!isPlainObject(attributes)) {
-      throw new InvalidContextError("Context `attributes` must be an object.");
+      throw new InvalidContextError("Context `attributes` must be an object.", {
+        code: "CONTEXT_ATTRIBUTES_INVALID",
+      });
     }
     context.attributes = Object.freeze({
       ...attributes,

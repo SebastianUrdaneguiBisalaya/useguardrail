@@ -29,11 +29,44 @@ export type Context = {
 /** Outcome of an evaluation. */
 export type DecisionEffect = "allow" | "deny";
 
+/**
+ * Language-neutral values that explain an error or a decision (positions, role names,
+ * policy ids, paths). Serializable, and safe to pass to an i18n library.
+ */
+export type MessageParams = Readonly<
+  Record<string, string | number | boolean | readonly string[]>
+>;
+
+/**
+ * Every stable decision `code` produced by the built-in evaluators and the engine.
+ * Custom evaluators may use their own codes.
+ */
+export const DECISION_CODES = [
+  "ROLE_GRANTS",
+  "POLICY_ALLOWS",
+  "POLICY_DENIES",
+  "RELATION_GRANTS",
+  "DEFAULT_DENY",
+  "EVALUATOR_FAILED",
+  "EVALUATOR_MALFORMED",
+  "NO_SUBJECT",
+] as const;
+
+/** A built-in decision code. See {@link DECISION_CODES}. */
+export type DecisionCode = (typeof DECISION_CODES)[number];
+
 /** The result of evaluating an access request. */
 export type Decision = {
   readonly effect: DecisionEffect;
-  /** Human-readable explanation of why this decision was reached. */
+  /** English explanation of why this decision was reached. Use `code` + `params` to localize. */
   readonly reason: string;
+  /**
+   * Stable identifier for the reason (a {@link DecisionCode} for built-ins). Optional so
+   * custom evaluators are not forced to provide one.
+   */
+  readonly code?: string;
+  /** Values that fill in a translated message for `code`. */
+  readonly params?: MessageParams;
 };
 
 /** Everything an evaluator needs to decide on a single access request. */

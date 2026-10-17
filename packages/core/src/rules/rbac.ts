@@ -1,4 +1,5 @@
 import { InvalidPolicyError } from "../errors.js";
+import { ownProperty } from "../own.js";
 import type { Evaluator } from "../types/index.js";
 
 /** A role and the permissions it grants. */
@@ -23,9 +24,22 @@ type Permission = {
   readonly action: string;
 };
 
-const parsePermission = (permission: unknown, role: string): Permission => {
+const parsePermission = (
+  permission: unknown,
+  role: string,
+  index: number,
+): Permission => {
   if (typeof permission !== "string") {
-    throw new InvalidPolicyError(`Role "${role}" has a non-string permission.`);
+    throw new InvalidPolicyError(
+      `Role "${role}" has a non-string permission at index ${index}.`,
+      {
+        code: "PERMISSION_NOT_STRING",
+        params: {
+          index,
+          role,
+        },
+      },
+    );
   }
   if (permission === "*") {
     return {
@@ -36,7 +50,14 @@ const parsePermission = (permission: unknown, role: string): Permission => {
   const separator = permission.indexOf(":");
   if (separator <= 0 || separator === permission.length - 1) {
     throw new InvalidPolicyError(
-      `Role "${role}" has invalid permission "${permission}"; expected "<resource>:<action>" or "*".`,
+      `Role "${role}" has an invalid permission at index ${index}; expected "<resource>:<action>" or "*".`,
+      {
+        code: "PERMISSION_FORMAT_INVALID",
+        params: {
+          index,
+          role,
+        },
+      },
     );
   }
   return {
@@ -72,6 +93,9 @@ export function createRbacEvaluator(config: RbacConfig): Evaluator {
   ) {
     throw new InvalidPolicyError(
       "RBAC config requires `roles` to be an object.",
+      {
+        code: "RBAC_ROLES_INVALID",
+      },
     );
   }
 
@@ -79,11 +103,22 @@ export function createRbacEvaluator(config: RbacConfig): Evaluator {
   for (const [name, definition] of Object.entries(rawRoles)) {
     const candidate = definition as Partial<RoleDefinition> | null;
     if (typeof candidate !== "object" || candidate === null) {
-      throw new InvalidPolicyError(`Role "${name}" must be an object.`);
+      throw new InvalidPolicyError(`Role "${name}" must be an object.`, {
+        code: "ROLE_NOT_OBJECT",
+        params: {
+          role: name,
+        },
+      });
     }
     if (!isStringArray(candidate.permissions)) {
       throw new InvalidPolicyError(
         `Role "${name}" requires \`permissions\` to be an array of strings.`,
+        {
+          code: "ROLE_PERMISSIONS_INVALID",
+          params: {
+            role: name,
+          },
+        },
       );
     }
     if (
@@ -92,6 +127,12 @@ export function createRbacEvaluator(config: RbacConfig): Evaluator {
     ) {
       throw new InvalidPolicyError(
         `Role "${name}" requires \`inherits\` to be an array of strings.`,
+        {
+          code: "ROLE_INHERITS_INVALID",
+          params: {
+            role: name,
+          },
+        },
       );
     }
     definitions.set(name, candidate as RoleDefinition);
@@ -112,16 +153,32 @@ export function createRbacEvaluator(config: RbacConfig): Evaluator {
           ...path,
           name,
         ].join(" -> ")}.`,
+        {
+          code: "ROLE_INHERITANCE_CYCLE",
+          params: {
+            cycle: [
+              ...path,
+              name,
+            ],
+          },
+        },
       );
     }
     const definition = definitions.get(name);
     if (!definition) {
       throw new InvalidPolicyError(
         `Role "${path[path.length - 1]}" inherits unknown role "${name}".`,
+        {
+          code: "ROLE_INHERITS_UNKNOWN",
+          params: {
+            inherited: name,
+            role: path[path.length - 1] ?? "",
+          },
+        },
       );
     }
-    const permissions = definition.permissions.map((permission) =>
-      parsePermission(permission, name),
+    const permissions = definition.permissions.map((permission, index) =>
+      parsePermission(permission, name, index),
     );
     for (const parent of definition.inherits ?? []) {
       permissions.push(
@@ -141,7 +198,10 @@ export function createRbacEvaluator(config: RbacConfig): Evaluator {
   }
 
   return ({ action, resource, subject }) => {
-    for (const role of subject.roles ?? []) {
+    const assigned = ownProperty(subject, "roles");
+    for (const role of (Array.isArray(assigned)
+      ? assigned
+      : []) as readonly string[]) {
       const permissions = resolved.get(role);
       const granted = permissions?.some(
         (permission) =>
@@ -151,7 +211,13 @@ export function createRbacEvaluator(config: RbacConfig): Evaluator {
       );
       if (granted) {
         return {
+          code: "ROLE_GRANTS",
           effect: "allow",
+          params: {
+            action,
+            resource: resource.type,
+            role,
+          },
           reason: `Role "${role}" grants "${resource.type}:${action}".`,
         };
       }

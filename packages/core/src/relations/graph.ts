@@ -87,13 +87,26 @@ export function createRelationGraph(
   if (!Array.isArray(rawTuples)) {
     throw new InvalidPolicyError(
       "Relation graph config requires `tuples` to be an array.",
+      {
+        code: "GRAPH_TUPLES_INVALID",
+      },
     );
   }
 
   const index = new Map<string, string[]>();
-  for (const tuple of rawTuples as Array<Partial<RelationTuple> | null>) {
+  for (const [position, tuple] of (
+    rawTuples as Array<Partial<RelationTuple> | null>
+  ).entries()) {
     if (typeof tuple !== "object" || tuple === null) {
-      throw new InvalidPolicyError("Each relation tuple must be an object.");
+      throw new InvalidPolicyError(
+        `Relation tuple at index ${position} must be an object.`,
+        {
+          code: "TUPLE_NOT_OBJECT",
+          params: {
+            index: position,
+          },
+        },
+      );
     }
     const { object, relation, subject } = tuple;
     if (
@@ -102,12 +115,24 @@ export function createRelationGraph(
       !isReference(subject)
     ) {
       throw new InvalidPolicyError(
-        "Each relation tuple requires non-empty string `object`, `relation`, and `subject`.",
+        `Relation tuple at index ${position} requires non-empty string \`object\`, \`relation\`, and \`subject\`.`,
+        {
+          code: "TUPLE_FIELDS_INVALID",
+          params: {
+            index: position,
+          },
+        },
       );
     }
     if (object.includes("#") || relation.includes("#") || !isUserset(subject)) {
       throw new InvalidPolicyError(
-        `Invalid relation tuple (${object}, ${relation}, ${subject}): "#" is only allowed once in a subject, as "<ref>#<relation>".`,
+        `Relation tuple at index ${position} is invalid: "#" is only allowed once in a subject, as "<ref>#<relation>".`,
+        {
+          code: "TUPLE_REFERENCE_INVALID",
+          params: {
+            index: position,
+          },
+        },
       );
     }
     const key = `${object}#${relation}`;
@@ -127,7 +152,9 @@ export function createRelationGraph(
     rawRules === null ||
     Array.isArray(rawRules)
   ) {
-    throw new InvalidPolicyError("Relation graph `rules` must be an object.");
+    throw new InvalidPolicyError("Relation graph `rules` must be an object.", {
+      code: "GRAPH_RULES_INVALID",
+    });
   }
   const rules = new Map<string, RelationRule>();
   for (const [relation, rule] of Object.entries(rawRules)) {
@@ -135,6 +162,12 @@ export function createRelationGraph(
     if (typeof candidate !== "object" || candidate === null) {
       throw new InvalidPolicyError(
         `Rule for relation "${relation}" must be an object.`,
+        {
+          code: "RULE_NOT_OBJECT",
+          params: {
+            relation,
+          },
+        },
       );
     }
     if (
@@ -143,6 +176,12 @@ export function createRelationGraph(
     ) {
       throw new InvalidPolicyError(
         `Rule "${relation}": \`impliedBy\` must be an array of non-empty strings.`,
+        {
+          code: "RULE_IMPLIED_BY_INVALID",
+          params: {
+            relation,
+          },
+        },
       );
     }
     const inherit: unknown = candidate.inheritFrom;
@@ -159,6 +198,12 @@ export function createRelationGraph(
     ) {
       throw new InvalidPolicyError(
         `Rule "${relation}": \`inheritFrom\` must be an array of { via, relation }.`,
+        {
+          code: "RULE_INHERIT_FROM_INVALID",
+          params: {
+            relation,
+          },
+        },
       );
     }
     rules.set(relation, candidate as RelationRule);
@@ -168,6 +213,9 @@ export function createRelationGraph(
   if (!Number.isInteger(maxDepth) || maxDepth < 1) {
     throw new InvalidPolicyError(
       "Relation graph `maxDepth` must be a positive integer.",
+      {
+        code: "GRAPH_MAX_DEPTH_INVALID",
+      },
     );
   }
 

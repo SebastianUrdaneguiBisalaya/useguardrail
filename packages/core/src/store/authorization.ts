@@ -1,6 +1,7 @@
 import { createContext } from "../context/index.js";
 import type { Engine } from "../engine/index.js";
 import { InvalidContextError, InvalidPolicyError } from "../errors.js";
+import { ownProperty } from "../own.js";
 import type {
   Action,
   Context,
@@ -44,6 +45,7 @@ export type AuthorizationStore = Pick<
 };
 
 const NO_SUBJECT: Decision = Object.freeze({
+  code: "NO_SUBJECT",
   effect: "deny",
   reason: "No subject; access denied.",
 });
@@ -56,6 +58,9 @@ const assertEngine = (engine: unknown): Engine => {
   ) {
     throw new InvalidPolicyError(
       "An engine created with createEngine is required.",
+      {
+        code: "ENGINE_REQUIRED",
+      },
     );
   }
   return engine as Engine;
@@ -65,14 +70,16 @@ const assertSubject = (subject: unknown): Subject | undefined => {
   if (subject === undefined) {
     return undefined;
   }
-  const id = (
-    subject as {
-      id?: unknown;
-    } | null
-  )?.id;
-  if (typeof subject !== "object" || typeof id !== "string" || id === "") {
+  const id =
+    typeof subject === "object" && subject !== null
+      ? ownProperty(subject, "id")
+      : undefined;
+  if (typeof id !== "string" || id === "") {
     throw new InvalidContextError(
       "Subject must be an object with a non-empty string `id`.",
+      {
+        code: "SUBJECT_INVALID",
+      },
     );
   }
   return subject as Subject;

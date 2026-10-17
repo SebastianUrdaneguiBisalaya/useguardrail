@@ -1,5 +1,10 @@
 import { InvalidPolicyError } from "../errors.js";
-import type { Decision, EvaluationInput, Evaluator } from "../types/index.js";
+import type {
+  Decision,
+  DecisionCode,
+  EvaluationInput,
+  Evaluator,
+} from "../types/index.js";
 
 /** Configuration for {@link createEngine}. */
 export type EngineConfig = {
@@ -23,10 +28,29 @@ export type Engine = {
   readonly evaluate: (input: EvaluationInput) => Decision;
 };
 
-const deny = (reason: string): Decision =>
+const deny = (reason: string, code: DecisionCode): Decision =>
   Object.freeze({
+    code,
     effect: "deny",
     reason,
+  });
+
+const passThrough = (decision: Decision): Decision =>
+  Object.freeze({
+    effect: decision.effect,
+    reason: decision.reason,
+    ...(decision.code === undefined
+      ? {}
+      : {
+          code: decision.code,
+        }),
+    ...(decision.params === undefined
+      ? {}
+      : {
+          params: Object.freeze({
+            ...decision.params,
+          }),
+        }),
   });
 
 const isDecision = (value: unknown): value is Decision => {
@@ -34,12 +58,17 @@ const isDecision = (value: unknown): value is Decision => {
     return false;
   }
   const candidate = value as {
+    code?: unknown;
     effect?: unknown;
+    params?: unknown;
     reason?: unknown;
   };
   return (
     (candidate.effect === "allow" || candidate.effect === "deny") &&
-    typeof candidate.reason === "string"
+    typeof candidate.reason === "string" &&
+    (candidate.code === undefined || typeof candidate.code === "string") &&
+    (candidate.params === undefined ||
+      (typeof candidate.params === "object" && candidate.params !== null))
   );
 };
 
@@ -59,6 +88,9 @@ export function createEngine(config: EngineConfig): Engine {
   ) {
     throw new InvalidPolicyError(
       "Engine config requires `evaluators` to be an array of functions.",
+      {
+        code: "EVALUATORS_INVALID",
+      },
     );
   }
   const registered: readonly Evaluator[] = Object.freeze([
@@ -73,7 +105,7 @@ export function createEngine(config: EngineConfig): Engine {
       try {
         result = evaluator(input);
       } catch {
-        return deny("An evaluator failed; access denied.");
+        return deny("An evaluator failed; access denied.", "EVALUATOR_FAILED");
       }
 
       if (result === undefined) {
@@ -82,24 +114,19 @@ export function createEngine(config: EngineConfig): Engine {
       if (!isDecision(result)) {
         return deny(
           "An evaluator returned a malformed decision; access denied.",
+          "EVALUATOR_MALFORMED",
         );
       }
       if (result.effect === "deny") {
-        return Object.freeze({
-          effect: "deny",
-          reason: result.reason,
-        });
+        return passThrough(result);
       }
       allowed ??= result;
     }
 
     if (allowed) {
-      return Object.freeze({
-        effect: "allow",
-        reason: allowed.reason,
-      });
+      return passThrough(allowed);
     }
-    return deny("No evaluator granted access (default deny).");
+    return deny("No evaluator granted access (default deny).", "DEFAULT_DENY");
   };
 
   return Object.freeze({

@@ -1,4 +1,5 @@
 import { InvalidPolicyError } from "../errors.js";
+import { ownProperty } from "../own.js";
 import type { Evaluator } from "../types/index.js";
 import type { RelationGraph } from "./graph.js";
 
@@ -38,6 +39,9 @@ export function createRebacEvaluator(config: RebacConfig): Evaluator {
   ) {
     throw new InvalidPolicyError(
       "ReBAC config requires a `graph` created with createRelationGraph.",
+      {
+        code: "REBAC_GRAPH_REQUIRED",
+      },
     );
   }
   const rawRequirements: unknown = config.requirements;
@@ -48,6 +52,9 @@ export function createRebacEvaluator(config: RebacConfig): Evaluator {
   ) {
     throw new InvalidPolicyError(
       "ReBAC config requires `requirements` to be an object.",
+      {
+        code: "REBAC_REQUIREMENTS_INVALID",
+      },
     );
   }
 
@@ -60,6 +67,12 @@ export function createRebacEvaluator(config: RebacConfig): Evaluator {
     ) {
       throw new InvalidPolicyError(
         `Requirements for resource type "${type}" must be an object.`,
+        {
+          code: "REBAC_REQUIREMENT_TYPE_INVALID",
+          params: {
+            resourceType: type,
+          },
+        },
       );
     }
     const byAction = new Map<string, string>();
@@ -67,6 +80,13 @@ export function createRebacEvaluator(config: RebacConfig): Evaluator {
       if (typeof relation !== "string" || relation === "") {
         throw new InvalidPolicyError(
           `Requirement "${type}:${action}" must be a non-empty relation name.`,
+          {
+            code: "REBAC_REQUIREMENT_INVALID",
+            params: {
+              action,
+              resourceType: type,
+            },
+          },
         );
       }
       byAction.set(action, relation);
@@ -78,13 +98,19 @@ export function createRebacEvaluator(config: RebacConfig): Evaluator {
 
   return ({ action, resource, subject }) => {
     const relation = requirements.get(resource.type)?.get(action);
-    if (relation === undefined || resource.id === undefined) {
+    const id = ownProperty(resource, "id");
+    if (relation === undefined || id === undefined) {
       return undefined;
     }
-    const object = `${resource.type}:${resource.id}`;
+    const object = `${resource.type}:${String(id)}`;
     return check(subject.id, relation, object)
       ? {
+          code: "RELATION_GRANTS",
           effect: "allow",
+          params: {
+            object,
+            relation,
+          },
           reason: `Subject holds "${relation}" on "${object}".`,
         }
       : undefined;
