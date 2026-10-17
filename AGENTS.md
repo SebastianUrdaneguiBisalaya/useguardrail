@@ -166,7 +166,7 @@ pnpm-workspace.yaml
 
 - **Client-first, runs in browser and Node.** The SDK holds no secret keys: it evaluates permissions from data the consumer's backend already authorized for that user. The server-side-only rules and the `typeof window` guard from section 6 do **not** apply to this project; do not add them.
 - Authorization on the client is a UX layer, not a security boundary. Document in the README that the backend must always re-enforce every decision.
-- Never log permission data, relation tuples, or user attributes outside an explicit consumer-controlled debug flag.
+- Never log permission data, relation tuples, or user attributes. The only sanctioned way out is the consumer-controlled `onDecision` hook (and `explain`), which the consumer wires up; the library never writes to the console itself.
 
 ## 1. Workspace layout
 
