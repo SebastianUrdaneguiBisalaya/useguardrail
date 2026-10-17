@@ -139,6 +139,39 @@ store.setSubject(undefined); // signed out: everything is denied
 
 `createStore` is also exported if you need a plain reactive store.
 
+## Loading state (async data)
+
+Evaluation is always **synchronous**. What is asynchronous is getting the data (the session, roles, tuples) from your backend. The store models that with a `status`:
+
+| Status | Meaning | `can()` / `evaluate()` |
+|---|---|---|
+| `"ready"` | Data is usable. A missing subject means signed out. | Normal result (`NO_SUBJECT` when signed out). |
+| `"loading"` | Data is still on its way. | Always `deny`, code `LOADING`. |
+| `"error"` | Loading failed. | Always `deny`, code `LOAD_FAILED`. |
+
+Without this, a store created before the session arrives would answer "no access" and the UI would flash a denial, then flip to allowed. Start in `"loading"` instead and let `load` fill the store:
+
+```ts
+const store = createAuthorizationStore({ engine, status: "loading" });
+
+await store.load(async ({ signal }) => {
+  const me = await fetch("/api/me", { signal }).then((r) => r.json());
+  return {
+    subject: { id: me.id, roles: me.roles },
+    context: { tenantId: me.organizationId },
+  };
+}); // never rejects
+
+store.getSnapshot().status; // "ready", or "error" (with the cause in .error)
+```
+
+- **Atomic.** The result's `subject`, `context`, and `engine` are applied together, and the status flips to `"ready"` in the same step, so there is never a half-updated state.
+- **Only present fields apply.** Omit a field to keep its current value; pass `subject: undefined` to sign out.
+- **Never rejects.** A loader that throws, or returns invalid data, leaves the store in `"error"` (`store.getSnapshot().error` holds the cause). A later successful `load` recovers.
+- **Stale loads are ignored.** Calling `load` again aborts the previous one (its `signal` fires, so `fetch` is cancelled) and discards its result, so a slow old response can never overwrite fresh data. Use it for tenant switches and refreshes.
+- **Manual control.** `setStatus("loading" | "ready")` and `setError(cause)` exist if you manage the fetching yourself. The other setters (`setSubject`, `setContext`, `setEngine`) never change the status.
+- **Default is `"ready"`**, so existing code that builds a store with a subject keeps working unchanged.
+
 ## Error handling
 
 Configuration errors are thrown when you create an engine, evaluator, graph, or store, never while evaluating. Every error extends `AuthorizationError`, so `instanceof` works:

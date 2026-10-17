@@ -10,6 +10,8 @@ All notable changes to `@useguardril/core` are documented here. This project fol
 
 ### Added
 
+- Loading state for `createAuthorizationStore`: `status` (`"loading" | "ready" | "error"`) and `error` in the state, a `status` config option, `setStatus`, `setError`, and `load(loader)` (atomic, abortable, never rejects, ignores stale results). Checks are denied with the new decision codes `LOADING` and `LOAD_FAILED` while not ready. New error codes `LOADER_INVALID` and `LOAD_RESULT_INVALID`.
+
 - `createEngine`: combines evaluators with deny-overrides and default-deny, failing closed.
 - `createRbacEvaluator`: roles, role inheritance, and `resource:action` permissions with wildcards.
 - `createAbacEvaluator`: attribute-based policies with a closed set of condition operators.
