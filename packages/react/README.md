@@ -131,6 +131,17 @@ return access === "allowed" ? <Invoice /> : <NoAccess />;
 
 Each hook re-renders only when its own value changes, so going from `"loading"` to `"allowed"` is a single re-render and never passes through `"denied"`.
 
+## Debugging a hidden component
+
+Ask the store why a check came out the way it did, from a component or from the console:
+
+```tsx
+const store = useAuthorizationStore();
+console.log(store.explain("update", { type: "invoice", id })); // decision, status, per-evaluator trace
+```
+
+To see every check, pass `onDecision` to `createAuthorizationStore`. Components call `can` while rendering, so it fires on every render-time check (and twice in `StrictMode`): use it to inspect decisions, not to count user actions. See the [root README](../../README.md#debugging-and-auditing).
+
 ## Server-side rendering and hydration
 
 Works with Next.js, Remix, and any `renderToString` / streaming setup. Every hook passes `store.getInitialSnapshot()` to React as the server snapshot, so the server render and the first client render both use the store's **initial** state. Hydration therefore never mismatches, even if the client store already received data before React hydrated; React then re-renders with the live state.
