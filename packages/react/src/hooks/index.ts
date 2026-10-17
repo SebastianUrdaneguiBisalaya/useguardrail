@@ -4,8 +4,16 @@ import type {
   Resource,
   Subject,
 } from "@useguardril/core";
+import { evaluateState } from "@useguardril/core";
 import { useSyncExternalStore } from "react";
 import { useAuthorizationStore } from "../provider/index.js";
+
+/*
+ * Every hook passes `store.getInitialSnapshot()` as the server snapshot. React uses it while
+ * rendering on the server and while hydrating, so the first client render matches the server
+ * HTML even if the client store already received data; React then re-renders with the live
+ * state if it differs.
+ */
 
 /**
  * Whether the current subject may perform `action` on `resource`.
@@ -23,7 +31,10 @@ import { useAuthorizationStore } from "../provider/index.js";
 export function useCan(action: Action, resource: Resource): boolean {
   const store = useAuthorizationStore();
   const getSnapshot = (): boolean => store.can(action, resource);
-  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
+  const getServerSnapshot = (): boolean =>
+    evaluateState(store.getInitialSnapshot(), action, resource).effect ===
+    "allow";
+  return useSyncExternalStore(store.subscribe, getSnapshot, getServerSnapshot);
 }
 
 /**
@@ -35,7 +46,9 @@ export function useCan(action: Action, resource: Resource): boolean {
 export function useSubject(): Subject | undefined {
   const store = useAuthorizationStore();
   const getSnapshot = (): Subject | undefined => store.getSnapshot().subject;
-  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
+  const getServerSnapshot = (): Subject | undefined =>
+    store.getInitialSnapshot().subject;
+  return useSyncExternalStore(store.subscribe, getSnapshot, getServerSnapshot);
 }
 
 /** The answer of {@link useAccess}. */
@@ -64,7 +77,16 @@ export function useAccess(action: Action, resource: Resource): AccessState {
     }
     return store.can(action, resource) ? "allowed" : "denied";
   };
-  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
+  const getServerSnapshot = (): AccessState => {
+    const initial = store.getInitialSnapshot();
+    if (initial.status === "loading") {
+      return "loading";
+    }
+    return evaluateState(initial, action, resource).effect === "allow"
+      ? "allowed"
+      : "denied";
+  };
+  return useSyncExternalStore(store.subscribe, getSnapshot, getServerSnapshot);
 }
 
 /**
@@ -80,7 +102,9 @@ export function useAccess(action: Action, resource: Resource): AccessState {
 export function useAuthorizationStatus(): AuthorizationStatus {
   const store = useAuthorizationStore();
   const getSnapshot = (): AuthorizationStatus => store.getSnapshot().status;
-  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
+  const getServerSnapshot = (): AuthorizationStatus =>
+    store.getInitialSnapshot().status;
+  return useSyncExternalStore(store.subscribe, getSnapshot, getServerSnapshot);
 }
 
 /**
@@ -92,5 +116,6 @@ export function useAuthorizationStatus(): AuthorizationStatus {
 export function useAuthorizationError(): unknown {
   const store = useAuthorizationStore();
   const getSnapshot = (): unknown => store.getSnapshot().error;
-  return useSyncExternalStore(store.subscribe, getSnapshot, getSnapshot);
+  const getServerSnapshot = (): unknown => store.getInitialSnapshot().error;
+  return useSyncExternalStore(store.subscribe, getSnapshot, getServerSnapshot);
 }
