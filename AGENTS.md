@@ -2,7 +2,7 @@
 
 Standards and best practices for building, maintaining, and publishing a Node.js library written in TypeScript, bundled with `tsup`, and distributed on npm.
 
-**This is a template repository.** Sections 1-10 below are generic and apply to any Node.js + TypeScript + tsup library. The final section, "Project context: `useguardril`," specializes them for this project — a frontend-first, framework-agnostic authorization SDK (RBAC, ReBAC, ABAC) — and takes precedence over the generic sections where they conflict (e.g. the server-side-only rules in section 6 do not apply).
+This repository started from a Node.js + TypeScript + tsup library template. Sections 1-9 below are the generic standards it follows. The final section, "Project context: `useguardril`," specializes them for this project — a frontend-first, framework-agnostic authorization SDK (RBAC, ReBAC, ABAC) — and takes precedence over the generic sections where they conflict (e.g. the server-side-only rules in section 6 do not apply).
 
 ## 1. Project structure
 
@@ -127,9 +127,9 @@ After any source change, run from the repo root and fix each failure before movi
 
 ## 8. Target environment: server, client, or both
 
-Before writing SDK code for a specific project (not while working on the generic template), check whether the project context states if the SDK is meant to run server-only, client-only, or both, and apply the corresponding rules:
+Before writing SDK code for a specific project check whether the project context states if the SDK is meant to run server-only, client-only, or both, and apply the corresponding rules:
 
-- **server-only** (a Node.js backend, API route, serverless function) — the default assumption in this template: apply the secret-key handling in section 6 as written.
+- **server-only** (a Node.js backend, API route, serverless function) — the default assumption in these standards: apply the secret-key handling in section 6 as written.
 - **client-only** (browser/mobile) — none of section 6's secret-key/server-side-only rules apply the same way, since there's no server-side code to guard; use a public/non-privileged key model instead.
 - **both** — the codebase needs a clear boundary (e.g. separate entry points/exports) between the server-side client that holds secrets and any client-side helper that doesn't.
 
@@ -137,7 +137,7 @@ This choice determines which practices from section 6 and from the "Client desig
 
 ## 9. Provider plugins (optional monorepo layout)
 
-**This template already ships with this layout applied** (`packages/core`, wired up via `pnpm-workspace.yaml`), even before any provider package exists — treat it as the baseline going forward, not something to opt into later. Everything below explains why it's shaped this way and how to add a provider package to it.
+**This repo uses this layout** (`packages/core`, `packages/react`, `packages/adapters`, wired up via `pnpm-workspace.yaml`) — treat it as the baseline, not something to opt into later. Everything below explains why it's shaped this way and how to add a provider package to it.
 
 If the SDK supports pluggable external providers (e.g. storage backends: S3, Cloudflare R2, GCS) and consumers should only install the dependencies a given provider actually needs, split the SDK into a `pnpm` workspace instead of a single package:
 

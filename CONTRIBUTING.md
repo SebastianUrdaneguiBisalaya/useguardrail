@@ -88,6 +88,7 @@ pnpm --filter @useguardril/core run bench
 - Cover, for each rule model you touch: allow, deny, default-deny, and malformed input.
 - Invariants ("never throws", "deny wins", "traversal terminates") are also checked with property-based tests ([fast-check](https://fast-check.dev/)) in `tests/properties/`, comparing the real code against a deliberately naive reference implementation. If you change evaluation logic, extend the reference and the generators too. A failing property prints a counterexample and a seed to replay it.
 - Public types are protected by type-level tests (`tests/types/*.test-d.ts`, using `expectTypeOf` and `@ts-expect-error`). They don't run: `pnpm run typecheck` fails if the declared API changes, so update them together with any intentional change to an exported type.
+- Docs: every name a package exports must appear in that package's `README.md` (`tests/docs/readme-exports.test.mjs` fails otherwise). When you add or change behavior, update the READMEs in the same PR, and keep their code examples complete and accurate: they are the only documentation, there is no docs site.
 - Never call a real backend or authorization service in tests; use sample payloads.
 - Cross-package behavior is tested in the consuming package: `core` + `react` in `packages/react/tests/integration/`, `adapters` + `core` in `packages/adapters/tests/integration/`.
 
@@ -111,7 +112,7 @@ Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `buil
 2. Fill in the PR description: what changed, why, and how it was tested. Link any related issue.
 3. Ensure the CI checks (typecheck, lint, test, build) pass; a PR with red checks will not be reviewed.
 4. If your change affects the public API (anything exported from a package's `src/index.ts`), call that out explicitly in the PR description and note whether it's a breaking change.
-5. Add a line to the affected package's `CHANGELOG.md` under the unreleased version.
+5. Add a line to the affected package's `CHANGELOG.md` under an `## Unreleased` heading at the top (create it above the latest version if it is missing).
 6. Be responsive to review feedback. A maintainer will merge once the PR is approved and CI is green.
 
 ## What you should *not* do
