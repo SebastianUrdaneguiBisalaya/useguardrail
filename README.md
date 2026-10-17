@@ -90,6 +90,31 @@ store.setSubject(undefined); // signed out: everything is denied
 
 `evaluate` is synchronous and never throws. Misconfiguration (a malformed policy, a role inheritance cycle, an invalid context) throws a typed error when you create the engine, evaluator, or store, never while evaluating.
 
+## Loading state
+
+Evaluation is synchronous; fetching the data is not. Create the store in `"loading"` and fill it with `store.load(...)`, so the UI shows a skeleton instead of flashing "no access" while the session loads:
+
+```tsx
+const store = createAuthorizationStore({ engine, status: "loading" });
+
+void store.load(async ({ signal }) => {
+  const me = await fetch("/api/me", { signal }).then((r) => r.json());
+  return { subject: { id: me.id, roles: me.roles }, context: { tenantId: me.org } };
+});
+
+<Can action="update" resource={{ type: "invoice", id }} loading={<Skeleton />} fallback={<ReadOnlyBadge />}>
+  <EditButton />
+</Can>;
+```
+
+| Status | `can()` | React |
+|---|---|---|
+| `"loading"` | `deny` (`LOADING`) | `<Can loading>` / `useAccess` → `"loading"` |
+| `"ready"` | normal | `"allowed"` or `"denied"` |
+| `"error"` | `deny` (`LOAD_FAILED`) | `useAuthorizationStatus()` → `"error"`, `useAuthorizationError()` has the cause |
+
+`load` never rejects, applies subject, context, and engine atomically, and ignores stale results when called again (for example on a tenant switch). Details in the [core README](./packages/core/README.md#loading-state-async-data).
+
 ## Security model
 
 What the SDK defends against:
@@ -118,7 +143,9 @@ Rule of thumb: **mistakes in configuration throw when you create the engine, eva
 | ReBAC resource without an `id`, or an action with no requirement | — | The evaluator has no opinion, so the result is `deny` unless another evaluator allows. |
 | An evaluator that throws, or returns a malformed decision | — | `deny`. The error detail is not exposed in the decision. |
 | ReBAC wildcard subjects (such as OpenFGA's `user:*`) | not supported | Kept as written and match nobody. |
-| Evaluation | synchronous only | There is no async evaluator. Load data first, then call `setEngine` or `setSubject`. |
+| Evaluation | synchronous only | There is no async evaluator. Fetch data with `store.load(...)` (see [Loading state](#loading-state)); until it arrives, every check is denied with code `LOADING`. |
+| A loader that throws or returns invalid data | — | The store goes to `"error"` and denies everything (`LOAD_FAILED`); `load` itself never rejects. |
+| A newer `store.load(...)` while one is running | — | The older load is aborted and its result ignored. |
 
 ### Limits that throw (at creation time)
 
@@ -192,12 +219,14 @@ const decision = store.evaluate("update", resource);
 | `DEFAULT_DENY` | — | No evaluator had an opinion. |
 | `EVALUATOR_FAILED` / `EVALUATOR_MALFORMED` | — | An evaluator threw or returned a malformed decision. |
 | `NO_SUBJECT` | — | Nobody is signed in (store). |
+| `LOADING` | — | The store's data is still loading (store). |
+| `LOAD_FAILED` | — | Loading the store's data failed (store). |
 
 ### Error codes
 
 | Area | Codes | Params |
 |---|---|---|
-| Context, subject, engine | `CONTEXT_NOT_OBJECT`, `CONTEXT_TENANT_ID_INVALID`, `CONTEXT_ATTRIBUTES_INVALID`, `SUBJECT_INVALID`, `ENGINE_REQUIRED`, `EVALUATORS_INVALID` | — |
+| Context, subject, engine | `CONTEXT_NOT_OBJECT`, `CONTEXT_TENANT_ID_INVALID`, `CONTEXT_ATTRIBUTES_INVALID`, `SUBJECT_INVALID`, `ENGINE_REQUIRED`, `EVALUATORS_INVALID`, `LOADER_INVALID`, `LOAD_RESULT_INVALID` | — |
 | RBAC | `RBAC_ROLES_INVALID` | — |
 | | `ROLE_NOT_OBJECT`, `ROLE_PERMISSIONS_INVALID`, `ROLE_INHERITS_INVALID` | `role` |
 | | `PERMISSION_NOT_STRING`, `PERMISSION_FORMAT_INVALID` | `role`, `index` |
