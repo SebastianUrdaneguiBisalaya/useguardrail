@@ -50,6 +50,8 @@ export const DECISION_CODES = [
   "EVALUATOR_FAILED",
   "EVALUATOR_MALFORMED",
   "NO_SUBJECT",
+  "LOADING",
+  "LOAD_FAILED",
 ] as const;
 
 /** A built-in decision code. See {@link DECISION_CODES}. */

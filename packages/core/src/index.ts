@@ -31,7 +31,10 @@ export type {
 } from "./rules/index.js";
 export { createAbacEvaluator, createRbacEvaluator } from "./rules/index.js";
 export type {
+  AuthorizationLoader,
+  AuthorizationLoadResult,
   AuthorizationState,
+  AuthorizationStatus,
   AuthorizationStore,
   AuthorizationStoreConfig,
 } from "./store/authorization.js";
