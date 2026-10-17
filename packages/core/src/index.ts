@@ -6,6 +6,18 @@ export {
   InvalidPolicyError,
 } from "./errors.js";
 export type {
+  InheritRule,
+  RebacConfig,
+  RelationGraph,
+  RelationGraphConfig,
+  RelationRule,
+  RelationTuple,
+} from "./relations/index.js";
+export {
+  createRebacEvaluator,
+  createRelationGraph,
+} from "./relations/index.js";
+export type {
   AbacConfig,
   AbacPolicy,
   Condition,
