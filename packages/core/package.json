@@ -18,6 +18,15 @@
     "url": "https://www.sebastianurdanegui.com/"
   },
   "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SebastianUrdaneguiBisalaya/useguardril.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/SebastianUrdaneguiBisalaya/useguardril/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/SebastianUrdaneguiBisalaya/useguardril/issues"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
