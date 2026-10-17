@@ -1,114 +1,124 @@
-# Node.js SDK Template
+# useguardril
 
-A template for building Node.js SDKs in TypeScript that wrap a third-party HTTP API — bundled with `tsup`, dual ESM/CJS support, and ready to publish to npm.
+A frontend-first, framework-independent authorization SDK for TypeScript. Describe who can do what with **RBAC**, **ABAC**, and **ReBAC**, evaluate it synchronously in the browser or in Node, and keep your UI in sync through a small reactive store.
 
-> This is a **template repository**, not a finished SDK. Use GitHub's **"Use this template" → "Create a new repository"** button to generate a new project from it (Settings → General → "Template repository" must be enabled on this repo). Cloning it directly also works, but you'll be carrying this repo's git history along.
+> **Client-side authorization is UX, not security.** Use it to decide what to show, enable, or route to. Your backend must always re-enforce every decision. These packages hold no secrets and never call a server.
 
-## Repository layout
+> **Status:** pre-1.0 and not yet published to npm.
 
-This is a `pnpm` workspace (see `pnpm-workspace.yaml`), not a single package:
+## Packages
 
-```
-packages/
-  core/          # the publishable SDK — everything below refers to this package
-```
+| Package | Description |
+|---|---|
+| [`@useguardril/core`](./packages/core) | The engine: RBAC, ABAC, and ReBAC evaluators, multi-tenant context, and a reactive store. No UI dependencies, zero runtime dependencies. |
+| [`@useguardril/react`](./packages/react) | React adapter: `AuthorizationProvider`, `useCan`, `<Can>`. Re-renders a component only when its own answer changes. |
 
-All commands below run from the **repo root** and delegate to the right workspace package via `pnpm --filter` (see the root `package.json` scripts) — you don't need to `cd` into `packages/core` for day-to-day work. See `AGENTS.md` (sections 8-9) for why this layout exists and how to add provider packages (`packages/<provider>`) to it.
+## Why useguardril
 
-## Using this template for a new SDK
+- **Three models, one API.** RBAC, ABAC, and ReBAC are pluggable evaluators that compose into a single decision.
+- **Safe by default.** Deny always wins, no opinion means deny, and an evaluator that throws or returns garbage also means deny.
+- **Framework-independent.** The engine knows nothing about React. The React adapter is a thin layer over a store contract (`subscribe` / `getSnapshot`) that works with `useSyncExternalStore`.
+- **Fast.** Microsecond evaluations at realistic sizes (see [Performance](#performance)).
+- **Explicit multi-tenancy.** The tenant travels in the evaluation context, never in module-level state.
 
-After creating a new repo from this template:
-
-1. Update `packages/core/package.json`: `name`, `description`, `keywords`, `author`, `repository` (if added), and remove `"private": true` (it's set here so the template itself can never be accidentally published to npm).
-2. `.github/workflows/publish.yml` already guards against publishing from a fork with `if: ${{ !github.event.repository.fork }}` — no repo path to hard-code, it works as-is.
-3. Replace the generic `Client` placeholder throughout `AGENTS.md`'s "Project context" section with the actual third-party API you're wrapping (client design, resource modules, error classes, credential handling — see that section for the checklist).
-4. Update this README's title, description, and examples once `packages/core/src/index.ts` has real exports.
-5. If the SDK handles a secret/API key, keep the server-side-only enforcement described in `AGENTS.md` (section 6) — don't skip that when adapting the template.
-
-## Development
-
-This is the exact sequence to run after making a source change, and how to actually try the built package locally. Run every command from the repo root with `pnpm` — they delegate to `packages/core` automatically.
-
-### After any change to `packages/core/src/`, `tsup.config.ts`, `tsconfig.json`, or `package.json`
-
-Run these in order and fix any failure before moving to the next step — don't skip ahead on a red step:
+## Quick start
 
 ```bash
-pnpm install          # only needed if dependencies changed
-pnpm run lint:fix      # auto-fix formatting/lint issues (biome)
-pnpm run typecheck     # tsc --noEmit — catches type errors
-pnpm run test          # vitest run
-pnpm run build         # tsup — confirms the package actually bundles
+pnpm add -E @useguardril/core @useguardril/react
 ```
 
-Notes:
-- `pnpm run lint:fix` before `typecheck`/`test` so formatting noise never masks a real diff in review.
-- If the change touched exports in `packages/core/src/index.ts`, treat it as a public API change: bump the version following semver and update `CHANGELOG.md`/docs accordingly (see [AGENTS.md](./AGENTS.md)).
-- `.husky/pre-commit` already runs `lint` + `typecheck` and `.husky/pre-push` already runs `test` + `build` automatically — running them manually first just means you catch problems before the hook does, which is faster feedback.
+```tsx
+import {
+  createAuthorizationStore,
+  createEngine,
+  createRbacEvaluator,
+} from "@useguardril/core";
+import { AuthorizationProvider, Can, useCan } from "@useguardril/react";
 
-### Trying the built package locally, as a consumer would
+const engine = createEngine({
+  evaluators: [
+    createRbacEvaluator({
+      roles: {
+        viewer: { permissions: ["invoice:read"] },
+        editor: { permissions: ["invoice:update"], inherits: ["viewer"] },
+      },
+    }),
+  ],
+});
 
-Running `pnpm run build` alone is not enough to know the package works when installed — `exports`, `dist` file paths, and CJS/ESM interop can only be verified by actually installing the built tarball somewhere else.
+const store = createAuthorizationStore({
+  engine,
+  subject: { id: "user:ana", roles: ["editor"] },
+  context: { tenantId: "acme" },
+});
+
+function Invoice({ id }: { id: string }) {
+  const canEdit = useCan("update", { type: "invoice", id });
+  return (
+    <>
+      <button disabled={!canEdit}>Edit</button>
+      <Can action="delete" resource={{ type: "invoice", id }} fallback={<span>Read only</span>}>
+        <button>Delete</button>
+      </Can>
+    </>
+  );
+}
+
+export const App = () => (
+  <AuthorizationProvider store={store}>
+    <Invoice id="42" />
+  </AuthorizationProvider>
+);
+```
+
+Not using React? `@useguardril/core` works on its own:
+
+```ts
+store.can("update", { type: "invoice", id: "42" }); // true
+store.setSubject(undefined); // signed out: everything is denied
+```
+
+## How decisions are combined
+
+| Situation | Result |
+|---|---|
+| Any evaluator denies | `deny` |
+| At least one allows and none deny | `allow` |
+| No evaluator has an opinion | `deny` (default deny) |
+| An evaluator throws or returns a malformed decision | `deny` (fails closed) |
+
+`evaluate` is synchronous and never throws. Misconfiguration (a malformed policy, a role inheritance cycle, an invalid context) throws a typed error when you create the engine, evaluator, or store, never while evaluating.
+
+## Performance
+
+Measured with `vitest bench` on an Apple M2 (Node 24). Each row is the mean time of one operation. "Before" and "after" are the same benchmark run on the code without and with the ABAC scope index, which looks up only the policies whose `actions` and `resources` match the request.
+
+| Scenario | Before | After | Change |
+|---|---|---|---|
+| ABAC, 1,000 policies spread over 50 resource types × 4 actions | 12.2 µs | 0.4 µs | **~30× faster** |
+| ABAC, 1,000 policies, all in scope, none match | 63.7 µs | 53.5 µs | ~1.2× faster |
+| Engine: RBAC + ABAC + ReBAC combined (1,000 in-scope ABAC policies) | 79.4 µs | 71.1 µs | ~1.1× faster |
+| RBAC, 500-role inheritance chain | 12.5 µs | 12.6 µs | unchanged |
+| ReBAC, 12-level parent chain, 5,014 tuples | 3.2 µs | 3.1 µs | unchanged |
+| ReBAC, negative lookup walking the whole chain | 3.3 µs | 3.3 µs | unchanged |
+| `setContext` with 1,000 subscribers each re-evaluating the combined engine | 161 ms | 140 ms | ~1.15× faster |
+
+What this means:
+
+- **The index pays off when policies are spread across resources and actions**, which is how real policy sets look. The worst case, where every policy is in scope and its conditions must be checked, is linear in the number of policies (about 50 ns each) and gains only a little.
+- **Construction is cheap and happens once:** building 500 roles takes about 0.34 ms, compiling 1,000 ABAC policies about 0.35 ms, and indexing 5,014 relation tuples about 1 ms.
+- **Evaluation cost is not what limits a UI.** A screen with dozens of `useCan` calls spends well under a frame on re-evaluation. The 140 ms row is a deliberately extreme case with 1,000 simultaneous subscribers.
+- Differences under roughly 5% between runs are noise.
+
+Reproduce with:
 
 ```bash
-pnpm run build
-pnpm --filter ./packages/core pack   # produces <package-name>-<version>.tgz in packages/core/
+pnpm --filter @useguardril/core run bench
 ```
 
-Then, in a separate scratch project (not inside this repo):
+## Contributing
 
-```bash
-mkdir -p /tmp/sdk-smoke-test && cd /tmp/sdk-smoke-test
-npm init -y
-npm install /absolute/path/to/<package-name>-<version>.tgz
-```
-
-Verify both module systems resolve correctly:
-
-```js
-// esm.mjs
-import { createClient } from "<package-name>";
-console.log(typeof createClient);
-```
-```js
-// cjs.cjs
-const { createClient } = require("<package-name>");
-console.log(typeof createClient);
-```
-```bash
-node esm.mjs
-node cjs.cjs
-```
-
-Also open the scratch project in an editor and check that hovering `createClient` shows the expected types — this catches broken `.d.ts` generation that compiling alone won't.
-
-Alternatively, for faster iteration while actively developing against another local project, use `pnpm link` instead of repacking on every change:
-
-```bash
-# in this repo
-pnpm run build
-pnpm --filter ./packages/core link --global
-
-# in the consumer project
-pnpm link --global <package-name>
-```
-
-Remember to `pnpm unlink --global <package-name>` in the consumer project once done, so it goes back to resolving the real published version.
-
-### Before opening a pull request
-
-```bash
-git switch -c feat/short-description   # or fix/, docs/, refactor/, test/, chore/ — see CONTRIBUTING.md
-pnpm run lint
-pnpm run typecheck
-pnpm run test
-pnpm run build
-git add <files>
-git commit -m "type(scope): description"      # commit-msg hook enforces Conventional Commits
-git push -u origin feat/short-description     # pre-push hook re-runs test + build
-```
-
-Then open the PR against `main` as described in [CONTRIBUTING.md](./CONTRIBUTING.md). Do not bump `version` in `package.json` as part of this flow — see the release process in [AGENTS.md](./AGENTS.md).
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Project standards live in [AGENTS.md](./AGENTS.md).
 
 ## License
 
