@@ -2,7 +2,7 @@
 
 Standards and best practices for building, maintaining, and publishing a Node.js library written in TypeScript, bundled with `tsup`, and distributed on npm.
 
-**This is a template repository.** Sections 1-10 below are generic and apply to any Node.js + TypeScript + tsup library. The final section, "Project context template: SDK for a third-party API," is a fill-in-the-blanks checklist for the specific case this template is meant for — wrapping a third-party HTTP API as an SDK — and should be adapted (or removed) once the template is instantiated for a real project.
+**This is a template repository.** Sections 1-10 below are generic and apply to any Node.js + TypeScript + tsup library. The final section, "Project context: `useguardril`," specializes them for this project — a frontend-first, framework-agnostic authorization SDK (RBAC, ReBAC, ABAC) — and takes precedence over the generic sections where they conflict (e.g. the server-side-only rules in section 6 do not apply).
 
 ## 1. Project structure
 
@@ -163,67 +163,93 @@ pnpm-workspace.yaml
 
 ---
 
-# Project context template: SDK for a third-party API
+# Project context: `useguardril` — frontend-first authorization SDK
 
-This section is a checklist to fill in (and rename) once this template is used to build an SDK for a specific third-party HTTP API — e.g. "Project context: Node.js SDK for `<Provider>`". Replace `<Provider>` and `Client` below with the actual API/service and the client class name you choose. If the resulting SDK isn't payments-related, adjust "Security" to match the actual sensitivity of the credentials/data involved — the server-side-only enforcement in section 6 still applies to any secret key, not just payment ones.
+`useguardril` is a framework-agnostic, frontend-first authorization SDK. It evaluates permissions on the client (UI gating, route guards, feature flags) and is designed to support **RBAC**, **ReBAC**, and **ABAC** models behind a single evaluation API. It is a `pnpm` monorepo (see section 9).
 
-## 0. Concrete file structure
+## 0. Target environment (section 8)
 
-The generic layout in section 1 above (top of this file) says "one file per internal module" in the abstract. For an SDK wrapping a third-party API with multiple resources, that concretely looks like this — nested under `packages/core/` per the monorepo layout in section 9:
+- **Client-first, runs in browser and Node.** The SDK holds no secret keys: it evaluates permissions from data the consumer's backend already authorized for that user. The server-side-only rules and the `typeof window` guard from section 6 do **not** apply to this project; do not add them.
+- Authorization on the client is a UX layer, not a security boundary. Document in the README that the backend must always re-enforce every decision.
+- Never log permission data, relation tuples, or user attributes outside an explicit consumer-controlled debug flag.
+
+## 1. Workspace layout
+
+Adapted to the existing repo (`packages/*` + `apps/*` in `pnpm-workspace.yaml`):
 
 ```
-packages/core/
-  src/
-    index.ts              # barrel file — re-exports only the public surface
-    client.ts             # createClient() factory: config, shared request logic, type Client
-    http.ts                # low-level fetch wrapper: base URL, headers, timeouts, retries
-    errors.ts             # ApiError, AuthenticationError, ValidationError, etc.
-    environment.ts         # the server-side-only runtime guard (section 6)
-    <resource>/            # one directory per API resource (e.g. users/, orders/, webhooks/)
-      index.ts             # the resource's methods (create/get/list/update/delete), as factory functions
-      types.ts             # request/response types for this resource only
-  tests/
-    client.test.ts
-    <resource>/
-      index.test.ts        # mirrors src/<resource>/index.ts
+apps/
+  website/                # docs website (section 10), already present
+packages/
+  core/                   # @useguardril/core — framework-independent engine
+    src/
+      index.ts            # barrel file — only public surface
+      engine/             # evaluate(), decision pipeline
+      rules/              # RBAC roles/permissions, ABAC policies
+      relations/          # ReBAC relation graph and traversal
+      context/            # multi-tenant and request context
+      store/              # reactive store (subscribe/getSnapshot)
+      types/              # shared public types
+      errors.ts           # typed error classes
+    tests/                # mirrors src/
+  react/                  # @useguardril/react — React adapter
+    src/
+      index.ts
+      provider/           # AuthorizationProvider
+      hooks/              # useCan(), ...
+      components/         # <Can>
+    tests/
+  adapters/               # @useguardril/adapters — backend response -> SDK contract
+    src/
+      index.ts
+      mapping/
+    tests/
+tests/
+  integration/            # cross-package tests (core + react)
+  performance/            # benchmarks
+  fixtures/               # shared fixtures
 ```
 
-- Each resource directory is self-contained: its own types file, its own methods file, its own tests. A change to how `<Provider>` shapes one resource's response never touches another resource's files.
-- `client.ts` composes the resources (e.g. `users: createUsersResource(deps)` inside the object `createClient` returns), it doesn't implement resource-specific logic itself. No classes — see section 2's no-OOP rule, which applies here too.
-- `errors.ts` and `environment.ts` are two of the few internal files re-exported in full from `index.ts` (the error classes and, if needed, the guard's error type) — everything else in `src/` stays internal unless explicitly re-exported (see section 1 at the top of this file).
+- Per-package `tests/` mirror `src/` (section 1); root `tests/` holds only cross-package suites.
+- `apps/*` are never published. `biome.json` lives at the repo root; each package owns its own `tsconfig.base.json` (extended by its `tsconfig.json`) and `vitest.config.ts`.
+- Start with these three packages. Each ships its own unit tests; `core` + `react` also get integration tests. There is no separate testing package: test factories and fixtures live in each package's `tests/` (or in root `tests/fixtures/` when shared).
 
-## 1. Client design
+## 2. Package responsibilities
 
-- Expose a main client created with the consumer's credentials, instead of loose functions that repeat the API key as a parameter on every call. Per section 2, this is a factory function, not a class instantiated with `new`:
-  ```ts
-  const client = createClient({ secretKey: "sk_..." });
-  await client.resource.create({ ... });
-  ```
-- Organize `<Provider>` API resources (e.g. users, orders, webhooks) as separate modules/namespaces within the client, each in its own file inside `src/`, re-exporting from `index.ts` only what should be public (request/response types, the client, error classes).
-- The client **must not** depend directly on environment variables (`process.env.PROVIDER_API_KEY`) inside the SDK: credentials are always explicitly injected by the consumer when constructing the client. Reading `process.env` is the responsibility of the app using the SDK, not the SDK itself.
+- **`core`**: permission evaluation, relations, rules, multi-tenant context, and a reactive store. **No UI or framework dependency, zero runtime dependencies.** Only package that defines the engine, shared types, and error classes.
+- **`react`**: `AuthorizationProvider`, hooks such as `useCan()`, and components such as `<Can>`. Peer-depends on `@useguardril/core` and `react`. Subscribes through `useSyncExternalStore` with selective subscriptions to minimize re-renders.
+- **`adapters`**: transforms responses from different backends into the SDK's common contract. Peer-depends on `@useguardril/core` (types only where possible).
 
-## 2. API error handling
+Dependency direction is one-way: `react`, `adapters` → `core`. `core` never imports from either, and they never import from each other.
 
-- Never let a raw HTTP error (a rejected `fetch`, a 4xx/5xx status) propagate as-is to the consumer. Map `<Provider>`'s error responses to your own typed error classes, exported from `index.ts` (e.g. `ApiError`, `AuthenticationError`, `ValidationError`), including the code and message returned by the API for debugging.
-- Validate input types at compile time (TypeScript) and, when the cost of a runtime error is high (money, PII, destructive operations), consider runtime validation too, since the consumer may be in plain JS without type checking.
+## 3. Engine design
 
-## 3. Security
+- The engine is a pure, synchronous-by-default evaluator: `(subject, action, resource, context) → Decision`. Model RBAC, ReBAC, and ABAC as pluggable evaluators that compose into one decision; don't special-case one model in the engine.
+- The reactive store is hand-rolled (`subscribe` / `getSnapshot`) and compatible with `useSyncExternalStore`. **Do not add Zustand or any state library** as a dependency.
+- No classes (section 2): `createEngine(config)`, `createStore(initial)`, etc. return plain objects/closures.
+- Decisions must be deterministic and side-effect free; the same inputs always produce the same result. Default to **deny** when no rule matches or evaluation fails.
+- Multi-tenancy is explicit: tenant identity travels in `context`, never in module-level state.
 
-- If this SDK uses a secret/API key, it's server-side only — see the general server-side-only rule in section 6. Concretely: never import `Client` in a browser bundle, and for any client-side flow use `<Provider>`'s own client-side/JS SDK with a public/non-privileged key, sending only the resulting non-sensitive token to the backend where this SDK runs.
-- Never log (`console.log`, `console.error`, telemetry) the full body of a request/response that may contain sensitive data or secrets. If debug logging is added, explicitly redact those fields.
-- Don't include secrets in error messages or in serializable objects the consumer might accidentally log.
-- All communication with `<Provider>`'s API must go over HTTPS; don't expose options that allow downgrading to HTTP.
-- Don't cache or persist sensitive data to disk or shared memory beyond the lifecycle of the request that uses it.
+## 4. Framework independence
 
-## 4. External API compatibility and stability
+- Only `packages/react` may import `react`. Future adapters (Vue, Svelte, Solid) follow the same pattern as separate packages built on `core`'s store contract.
+- Don't use browser-only or Node-only APIs in `core`; it must run in both.
 
-- Internally version against a known version of `<Provider>`'s API. If `<Provider>` introduces breaking changes to its API, the SDK should document which API version it was tested/is supported against.
-- Request/response types for each `<Provider>` resource should live in one file per resource (e.g. `src/<resource>/types.ts`) so a change in the shape of an endpoint is easy to locate and update.
-- Cover with tests (mocking the HTTP layer, never hitting the real `<Provider>` API in unit tests) at least the happy path and error mapping for each supported resource.
+## 5. Public API and errors
 
-## 5. Documentation for consumers
+- Every package exposes its surface only through its own `src/index.ts` (section 1).
+- Define and export typed errors from `core` (e.g. `InvalidPolicyError`, `AdapterMappingError`); never throw bare `Error`. Fail closed: invalid policies deny rather than allow.
+- Validate policy and adapter input at runtime — consumers may be in plain JS and the cost of a wrong "allow" is high.
 
-- `README.md` must include, at minimum: installation, client initialization, one example per main resource, and how to handle the typed errors the SDK exposes.
-- Every public exported function/method must have TSDoc with at least a one-line description and, when applicable, a usage example — this is what the consumer sees on hover in their editor, not just the README.
+## 6. Testing
 
-This section is a template to be specialized per project. Sections 1-10 above are the reusable, generic part of this template for any Node.js + TypeScript + tsup library.
+- Vitest; mock any HTTP/backend boundary, never hit a real service.
+- Cover per rule model (RBAC, ReBAC, ABAC): allow, deny, default-deny, and malformed input.
+- Integration tests assert that `core` store updates re-render only the components subscribed to the affected permission.
+- `performance/` holds benchmarks for evaluation over large policy/relation sets; regressions there are treated like failing tests.
+
+## 7. Documentation for consumers
+
+- Each package README: installation, minimal setup, one example per main API, error handling.
+- Every public export has TSDoc with a one-line description and a usage example where applicable.
+- Document the supported adapter contract and the "client authorization is UX, not security" caveat prominently.
