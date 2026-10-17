@@ -75,18 +75,46 @@ const graph = createRelationGraph({ tuples: openFgaTuplesAdapter(await readTuple
 
 Userset subjects (`"team:eng#member"`) and wildcard subjects (`"user:*"`, public access for every `user:...`) are preserved as written; the core graph understands both.
 
+## Reference
+
+| Export | Purpose |
+|---|---|
+| `createSessionAdapter(mapping: SessionMapping)` | Session/profile response to `{ subject, context }`. |
+| `createRolesAdapter(mapping: RolesMapping)` | Roles response to the `roles` object for `createRbacEvaluator`. |
+| `createTuplesAdapter(mapping: TuplesMapping)` | Any relation-record response to `RelationTuple[]`. |
+| `openFgaTuplesAdapter`, `spiceDbTuplesAdapter` | Ready-made adapters for OpenFGA and SpiceDB responses. |
+| `Adapter<T>` | `(response: unknown) => T`: the shape of every adapter, and of your own. |
+| `Session` | What the session adapter returns: `{ subject: Subject; context: Context }`. |
+
+Every adapter throws `AdapterMappingError` (exported by `@useguardril/core`, with a stable `code` and `params`) when the response does not have the expected shape.
+
 ## Writing your own
 
 Any function with the right shape is an adapter:
 
 ```ts
 import { AdapterMappingError } from "@useguardril/core";
+import type { RoleDefinition } from "@useguardril/core";
 import type { Adapter } from "@useguardril/adapters";
 
+// A legacy API answering { "admin": ["invoice:*"], "viewer": ["invoice:read"] }
 const legacyRoles: Adapter<Record<string, RoleDefinition>> = (response) => {
-  // validate, then return plain data; throw AdapterMappingError on bad input
+  if (typeof response !== "object" || response === null || Array.isArray(response)) {
+    throw new AdapterMappingError("Expected an object of role -> permissions.");
+  }
+  const roles: Record<string, RoleDefinition> = {};
+  Object.entries(response).forEach(([name, permissions], index) => {
+    if (name === "__proto__" || !Array.isArray(permissions) || !permissions.every((p) => typeof p === "string")) {
+      // Say where the problem is (the position), not what the backend sent.
+      throw new AdapterMappingError(`Role at position ${index} is not a list of permission strings.`);
+    }
+    roles[name] = { permissions };
+  });
+  return roles;
 };
 ```
+
+Rules for custom adapters: validate everything, never mutate the response, and keep response values out of error messages (name positions or paths) so errors are safe to log.
 
 ## License
 

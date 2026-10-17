@@ -148,6 +148,8 @@ The subject reference is `subject.id`; the resource reference is `"<type>:<id>"`
 A tuple whose subject is `"<type>:*"` grants the relation to **every subject whose reference starts with `<type>:`**:
 
 ```ts
+import { createRelationGraph } from "@useguardril/core";
+
 const graph = createRelationGraph({
   tuples: [{ object: "doc:handbook", relation: "viewer", subject: "user:*" }],
 });
@@ -226,13 +228,16 @@ Two helpers exist for UI adapters and server rendering:
 `engine.explain(input)` and `store.explain(action, resource)` return the decision together with a per-evaluator `trace` (and, for the store, the `status` and subject it ran in), so you can find out why something was denied. `onDecision` on `createEngine` and `createAuthorizationStore` receives the same event after every evaluation; the library never logs on its own.
 
 ```ts
-const { decision, trace } = engine.explain({ subject, action: "update", resource, context });
-trace.forEach(({ index, outcome }) => console.log(index, outcome)); // 0 "abstain", 1 "deny", ...
+import { createEngine } from "@useguardril/core";
 
 const engine = createEngine({
   evaluators,
+  // Called after every evaluation. Never able to change the decision.
   onDecision: ({ input, decision }) => audit.push([input.action, decision.code]),
 });
+
+const { decision, trace } = engine.explain({ subject, action: "update", resource, context });
+trace.forEach(({ index, outcome }) => console.log(index, outcome)); // 0 "abstain", 1 "deny", ...
 ```
 
 | Export | Purpose |
@@ -287,6 +292,8 @@ Evaluation is always **synchronous**. What is asynchronous is getting the data (
 Without this, a store created before the session arrives would answer "no access" and the UI would flash a denial, then flip to allowed. Start in `"loading"` instead and let `load` fill the store:
 
 ```ts
+import { createAuthorizationStore } from "@useguardril/core";
+
 const store = createAuthorizationStore({ engine, status: "loading" });
 
 await store.load(async ({ signal }) => {
@@ -312,7 +319,12 @@ store.getSnapshot().status; // "ready", or "error" (with the cause in .error)
 Configuration errors are thrown when you create an engine, evaluator, graph, or store, never while evaluating. Every error extends `AuthorizationError`, so `instanceof` works:
 
 ```ts
-import { AuthorizationError, InvalidContextError, InvalidPolicyError } from "@useguardril/core";
+import {
+  AuthorizationError,
+  createAbacEvaluator,
+  InvalidContextError,
+  InvalidPolicyError,
+} from "@useguardril/core";
 
 try {
   createAbacEvaluator({ policies: [{ id: "x", effect: "allow", conditions: [{ field: "nope", op: "eq", value: 1 }] }] });
@@ -330,6 +342,47 @@ try {
 ## Localizing messages
 
 `message` and `reason` are always English. Every error has a stable `code` and `params` (and every built-in decision has `code` and `params` too), so you can show text in your own language. `ERROR_CODES` and `DECISION_CODES` list them all; see the [root README](../../README.md#error-codes-and-localization) for the full tables and an example.
+
+## API reference
+
+Everything `@useguardril/core` exports. Each name links to where it is explained above, or is described here.
+
+**Factories and functions**
+
+| Export | Purpose |
+|---|---|
+| `createEngine(config)` | Combines evaluators into an `Engine` (`evaluate`, `explain`). |
+| `createRbacEvaluator(config)` | Roles, inheritance, `resource:action` permissions. |
+| `createAbacEvaluator(config)` | Attribute policies with `all` / `any` / `not` conditions. |
+| `createRelationGraph(config)` | Relation tuples, usersets, wildcards, rules. |
+| `createTenantRelationGraph(config)` | One isolated relation graph per tenant. |
+| `createRebacEvaluator(config)` | Turns a graph plus `requirements` into an evaluator. |
+| `createContext(input)` | Validates and freezes an evaluation `Context`. |
+| `createAuthorizationStore(config)` | Reactive store: engine + subject + context + status; `can`, `evaluate`, `explain`, `load`, setters. |
+| `createStore(initial)` | A plain reactive store (`getSnapshot`, `getInitialSnapshot`, `setState`, `subscribe`, `subscribeSelector`). |
+| `evaluateState(state, action, resource)` | Pure evaluation against any store state. |
+| `forSchema<S>()` | Binds all factories to a typed `Schema`. |
+
+**Errors and codes**
+
+| Export | Purpose |
+|---|---|
+| `AuthorizationError` | Base class of every error; has `code` and `params`. |
+| `InvalidPolicyError`, `InvalidContextError`, `AdapterMappingError` | Malformed policy / subject or context / backend data (the last one is thrown by `@useguardril/adapters`). |
+| `ERROR_CODES`, `DECISION_CODES`, `MAX_CONDITION_DEPTH` | Lists of every stable code, and the ABAC nesting limit. |
+
+**Types**
+
+| Group | Types |
+|---|---|
+| Request | `Subject`, `Resource`, `ResourceFor<T>`, `Action`, `Attributes`, `Context`, `EvaluationInput<S>` |
+| Decisions | `Decision`, `DecisionEffect`, `DecisionCode`, `Evaluator<S>`, `MessageParams`, `ErrorCode`, `ErrorDetails` |
+| Engine and debugging | `Engine<S>`, `EngineConfig<S>`, `DecisionEvent<S>`, `EvaluatorTrace`, `EvaluatorOutcome` |
+| RBAC | `RbacConfig<S>`, `RoleDefinition<S>`, `PermissionString<S>` |
+| ABAC | `AbacConfig<S>`, `AbacPolicy<S>`, `Condition`, `FieldCondition`, `AllCondition`, `AnyCondition`, `NotCondition`, `ConditionOperator` |
+| ReBAC | `RelationTuple`, `RelationRule`, `InheritRule`, `RelationGraph`, `RelationGraphConfig`, `TenantRelationGraph`, `TenantRelationGraphConfig`, `RebacConfig<S>`, `RebacRequirements<S>` |
+| Store | `AuthorizationStore<S>`, `AuthorizationStoreConfig<S>`, `AuthorizationState<S>`, `AuthorizationStatus`, `AuthorizationLoader<S>`, `AuthorizationLoadResult<S>`, `StoreDecisionEvent<S>`, `Store<T>`, `Listener`, `Unsubscribe` |
+| Schema | `Schema`, `ResourceName<S>`, `ActionName<S>`, `SchemaKit<S>` |
 
 ## License
 

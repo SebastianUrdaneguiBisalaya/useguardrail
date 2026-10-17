@@ -69,6 +69,8 @@ function Invoice({ id }: { id: string }) {
 
 Change who the user is, the tenant, or the policies by calling the store's setters (for example after sign-in); subscribed components update on their own.
 
+Types exported for your own wrappers: `AccessState` (`"loading" | "allowed" | "denied"`), `CanProps`, `AuthorizationProviderProps`, `SchemaKit`, `SchemaCanProps`. `MissingProviderError` (code `PROVIDER_MISSING`) is thrown when a hook or `<Can>` runs outside an `AuthorizationProvider`.
+
 ## Typed schema
 
 Bind the provider, `Can`, `useCan`, and `useAccess` to your schema once, and actions and resource types are checked at compile time. Use the same `AppSchema` you gave to `forSchema` from `@useguardril/core`:
@@ -84,11 +86,17 @@ export const { AuthorizationProvider, Can, useCan, useAccess, useAuthorizationSt
 ```
 
 ```tsx
-useCan("update", { type: "invoice", id });          // ok
-useCan("invite", { type: "invoice" });              // compile error: invite is a user action
-<Can action="invite" resource={{ type: "user" }}>   // ok
-  <InviteButton />
-</Can>;
+import { Can, useCan } from "./authorization-ui"; // the module you just wrote
+
+function Example({ id }: { id: string }) {
+  useCan("update", { type: "invoice", id }); // ok
+  useCan("invite", { type: "invoice" }); // compile error: invite is a user action
+  return (
+    <Can action="invite" resource={{ type: "user" }}> {/* ok */}
+      <InviteButton />
+    </Can>
+  );
+}
 ```
 
 `forSchema` returns the same components and hooks, only retyped: no runtime cost. The untyped `AuthorizationProvider` also accepts a schema-bound store.
@@ -98,6 +106,9 @@ useCan("invite", { type: "invoice" });              // compile error: invite is 
 Create the store in `"loading"` and fill it with `store.load(...)` (see the [core README](../core/README.md#loading-state-async-data)). Until the data arrives every check is denied, so use `<Can loading>` or `useAccess` to show a skeleton instead of flashing "no access":
 
 ```tsx
+import { createAuthorizationStore } from "@useguardril/core";
+import { Can, useAuthorizationStatus } from "@useguardril/react";
+
 const store = createAuthorizationStore({ engine, status: "loading" });
 void store.load(async ({ signal }) => {
   const me = await fetch("/api/me", { signal }).then((r) => r.json());
@@ -124,9 +135,13 @@ function InvoiceActions({ id }: { id: string }) {
 `useAccess` gives the same three-way answer as a value:
 
 ```tsx
-const access = useAccess("read", { type: "invoice", id });
-if (access === "loading") return <Skeleton />;
-return access === "allowed" ? <Invoice /> : <NoAccess />;
+import { useAccess } from "@useguardril/react";
+
+function InvoicePage({ id }: { id: string }) {
+  const access = useAccess("read", { type: "invoice", id });
+  if (access === "loading") return <Skeleton />;
+  return access === "allowed" ? <Invoice /> : <NoAccess />;
+}
 ```
 
 Each hook re-renders only when its own value changes, so going from `"loading"` to `"allowed"` is a single re-render and never passes through `"denied"`.
@@ -136,8 +151,13 @@ Each hook re-renders only when its own value changes, so going from `"loading"` 
 Ask the store why a check came out the way it did, from a component or from the console:
 
 ```tsx
-const store = useAuthorizationStore();
-console.log(store.explain("update", { type: "invoice", id })); // decision, status, per-evaluator trace
+import { useAuthorizationStore } from "@useguardril/react";
+
+function DebugInvoice({ id }: { id: string }) {
+  const store = useAuthorizationStore(); // does not subscribe, so it never re-renders
+  console.log(store.explain("update", { type: "invoice", id })); // decision, status, per-evaluator trace
+  return null;
+}
 ```
 
 To see every check, pass `onDecision` to `createAuthorizationStore`. Components call `can` while rendering, so it fires on every render-time check (and twice in `StrictMode`): use it to inspect decisions, not to count user actions. See the [root README](../../README.md#debugging-and-auditing).
