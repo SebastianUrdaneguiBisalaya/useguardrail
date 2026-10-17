@@ -1,7 +1,7 @@
 {
-  "name": "node-sdk-template",
+  "name": "useguardril",
   "version": "0.0.0",
-  "description": "Monorepo workspace root: Node.js SDK template (packages/core) + docs website (apps/website).",
+  "description": "Monorepo workspace root: useguardril, a frontend-first authorization SDK (packages/*) + docs website (apps/website).",
   "license": "ISC",
   "private": true,
   "scripts": {

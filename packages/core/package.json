@@ -1,11 +1,14 @@
 {
-  "name": "node-sdk-template",
+  "name": "@useguardril/core",
   "version": "0.1.0",
-  "description": "Template for a Node.js SDK in TypeScript wrapping a third-party HTTP API, with dual ESM/CJS support.",
+  "description": "Framework-independent authorization engine (RBAC, ReBAC, ABAC) with a reactive store, with dual ESM/CJS support.",
   "keywords": [
-    "sdk",
+    "authorization",
+    "rbac",
+    "rebac",
+    "abac",
+    "permissions",
     "typescript",
-    "template",
     "tsup",
     "esm",
     "cjs"
