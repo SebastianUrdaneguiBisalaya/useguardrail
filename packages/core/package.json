@@ -37,6 +37,7 @@
   ],
   "sideEffects": false,
   "scripts": {
+    "bench": "vitest bench --run",
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
