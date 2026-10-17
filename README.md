@@ -4,7 +4,25 @@ A frontend-first, framework-independent authorization SDK for TypeScript. Descri
 
 > **Client-side authorization is UX, not security.** Use it to decide what to show, enable, or route to. Your backend must always re-enforce every decision. These packages hold no secrets and never call a server.
 
-> **Status:** pre-1.0 and not yet published to npm.
+> **Status:** `0.1.x`, published on npm under the `@useguardril` scope. The public API may still change before 1.0; every change is listed in each package's `CHANGELOG.md`.
+
+## Contents
+
+- [Packages](#packages)
+- [Why useguardril](#why-useguardril)
+- [Concepts](#concepts)
+- [Requirements](#requirements)
+- [Quick start](#quick-start)
+- [How decisions are combined](#how-decisions-are-combined)
+- [Loading state](#loading-state)
+- [Multi-tenancy and public access](#multi-tenancy-and-public-access)
+- [Recipes](#recipes)
+- [Typed actions and resources](#typed-actions-and-resources)
+- [Debugging and auditing](#debugging-and-auditing)
+- [Security model](#security-model)
+- [Limits and edge behavior](#limits-and-edge-behavior)
+- [Error codes and localization](#error-codes-and-localization)
+- [Performance](#performance)
 
 ## Packages
 
@@ -21,6 +39,28 @@ A frontend-first, framework-independent authorization SDK for TypeScript. Descri
 - **Framework-independent.** The engine knows nothing about React. The React adapter is a thin layer over a store contract (`subscribe` / `getSnapshot`) that works with `useSyncExternalStore`.
 - **Fast.** Microsecond evaluations at realistic sizes (see [Performance](#performance)).
 - **Explicit multi-tenancy.** The tenant travels in the evaluation context, never in module-level state.
+
+## Concepts
+
+| Term | What it is |
+|---|---|
+| **Subject** | Who is asking: `{ id, roles?, attributes? }`. |
+| **Resource** | What is being accessed: `{ type, id?, attributes? }`. |
+| **Action** | What they want to do, a string such as `"update"`. |
+| **Context** | The situation: `{ tenantId?, attributes? }`. |
+| **Evaluator** | One authorization model (RBAC, ABAC, or ReBAC). It allows, denies, or has no opinion. |
+| **Engine** | Combines evaluators into one **Decision**: `{ effect: "allow" \| "deny", reason, code?, params? }`. |
+| **Store** | Holds the engine, the subject, the context, and a loading status. It is what UIs subscribe to. |
+
+## Requirements
+
+| | |
+|---|---|
+| Runtime | Node 18+, or a browser with `Object.hasOwn`, `queueMicrotask`, and `AbortController` (Chrome 93+, Firefox 92+, Safari 15.4+, Edge 93+). |
+| React adapter | React 18 or 19. |
+| TypeScript | Types are tested with TypeScript 5.7. Schema typing uses template literal types. |
+| Formats | ESM and CommonJS, both with type declarations. |
+| Dependencies | None at runtime. |
 
 ## Quick start
 
@@ -95,6 +135,9 @@ store.setSubject(undefined); // signed out: everything is denied
 Evaluation is synchronous; fetching the data is not. Create the store in `"loading"` and fill it with `store.load(...)`, so the UI shows a skeleton instead of flashing "no access" while the session loads:
 
 ```tsx
+import { createAuthorizationStore } from "@useguardril/core";
+import { Can } from "@useguardril/react";
+
 const store = createAuthorizationStore({ engine, status: "loading" });
 
 void store.load(async ({ signal }) => {
@@ -120,6 +163,8 @@ void store.load(async ({ signal }) => {
 **Tenants.** The tenant always travels in `context.tenantId`. For ReBAC, `createTenantRelationGraph` gives each tenant its own graph, and the evaluator picks it by `context.tenantId`, so a relation in one tenant can never grant access in another, even when their references look alike. With no tenant, or an unknown one, the evaluator has no opinion and the result is `deny`.
 
 ```ts
+import { createRebacEvaluator, createTenantRelationGraph } from "@useguardril/core";
+
 const graph = createTenantRelationGraph({
   tuples: {
     acme: [{ object: "doc:1", relation: "viewer", subject: "user:ana" }],
@@ -138,6 +183,184 @@ store.setContext({ tenantId: "acme" }); // switching tenant switches the graph
 ```
 
 Details, limits, and the rules for wildcards are in the [core README](./packages/core/README.md#rebac-createrelationgraph--createrebacevaluator). RBAC and ABAC have no tenant graph: carry the tenant in the roles you load for that tenant, or compare `context.tenantId` in an ABAC condition.
+
+## Recipes
+
+Short, copy-pasteable answers to common needs. They assume a `store` created as in the [Quick start](#quick-start).
+
+### Sign in and sign out
+
+```ts
+// After your sign-in call succeeds: fetch the session and put it in the store.
+await store.load(async ({ signal }) => {
+  const me = await fetch("/api/me", { signal }).then((r) => r.json());
+  return { subject: { id: me.id, roles: me.roles }, context: { tenantId: me.org } };
+});
+
+// Sign out: everything is denied (NO_SUBJECT) until someone signs in again.
+store.setSubject(undefined);
+```
+
+### Refresh permissions when they change
+
+```ts
+// Call it whenever you learn permissions may have changed: a websocket message,
+// window focus, a timer, or right after an admin action.
+function refreshPermissions() {
+  return store.load(async ({ signal }) => {
+    const me = await fetch("/api/me", { signal }).then((r) => r.json());
+    return { subject: { id: me.id, roles: me.roles } };
+  });
+}
+```
+
+A newer `load` aborts the one still running and its result is ignored, so calling it often is safe. Components update on their own. If the rules themselves changed, return a new engine too: `return { subject, engine: createEngine({ evaluators }) }`.
+
+### Switch tenant
+
+```ts
+// When each tenant has its own data (roles, relations): reload for the new tenant.
+await store.load(async ({ signal }) => {
+  const data = await fetch(`/api/tenants/${tenantId}/session`, { signal }).then((r) => r.json());
+  return { subject: data.subject, context: { tenantId } };
+});
+
+// When you already hold every tenant's data (see "Multi-tenancy"): just change the context.
+store.setContext({ tenantId: "globex" });
+```
+
+### Users can edit their own records
+
+An ABAC policy compares a subject field with a resource field:
+
+```ts
+import { createAbacEvaluator } from "@useguardril/core";
+
+const ownership = createAbacEvaluator({
+  policies: [
+    {
+      id: "authors-edit-their-posts",
+      effect: "allow",
+      actions: ["update", "delete"],
+      resources: ["post"],
+      conditions: [{ field: "subject.id", op: "eq", valueFrom: "resource.attributes.authorId" }],
+    },
+  ],
+});
+
+// The resource you check carries the attribute:
+store.can("update", { type: "post", id: "9", attributes: { authorId: "user:ana" } });
+```
+
+### Plans and feature flags
+
+Put the plan or flag in the context and test it in a policy:
+
+```ts
+import { createAbacEvaluator } from "@useguardril/core";
+
+const flags = createAbacEvaluator({
+  policies: [
+    {
+      id: "reports-need-a-paid-plan",
+      effect: "allow",
+      actions: ["read"],
+      resources: ["report"],
+      conditions: [{ field: "context.attributes.plan", op: "in", value: ["pro", "enterprise"] }],
+    },
+  ],
+});
+
+store.setContext({ tenantId: "acme", attributes: { plan: "pro" } });
+```
+
+### Hide, disable, or show a placeholder
+
+```tsx
+import { Can, useAccess, useCan } from "@useguardril/react";
+
+function InvoiceRow({ id }: { id: string }) {
+  const invoice = { type: "invoice", id };
+  const canDelete = useCan("delete", invoice); // disable
+  const access = useAccess("read", invoice); // tell "loading" apart from "denied"
+
+  if (access === "loading") return <Skeleton />;
+  return (
+    <>
+      <Can action="update" resource={invoice}>
+        <EditButton /> {/* hidden when not allowed */}
+      </Can>
+      <button disabled={!canDelete}>Delete</button>
+    </>
+  );
+}
+```
+
+### Guard a route
+
+Outside React, use the store directly. Wait for the session first so a slow load is not read as "denied":
+
+```ts
+import { redirect } from "react-router";
+
+const sessionReady = store.load(fetchSession); // started once, when the app starts
+
+export async function invoiceLoader({ params }: { params: { id: string } }) {
+  await sessionReady;
+  if (!store.can("read", { type: "invoice", id: params.id })) {
+    throw redirect("/forbidden");
+  }
+  return null;
+}
+```
+
+A guard only improves the experience: your server must still refuse the request.
+
+### Use it without a framework
+
+```ts
+const invoice = { type: "invoice", id: "42" };
+const button = document.querySelector<HTMLButtonElement>("#delete")!;
+
+button.hidden = !store.can("delete", invoice);
+// Runs only when this specific answer changes, not on every store change.
+store.subscribeSelector(
+  () => store.can("delete", invoice),
+  (allowed) => {
+    button.hidden = !allowed;
+  },
+);
+```
+
+### Test your own rules
+
+Rules are plain data, so they are easy to test without a UI:
+
+```ts
+import { createEngine, createRbacEvaluator } from "@useguardril/core";
+import { expect, it } from "vitest";
+
+it("viewers cannot update invoices", () => {
+  const engine = createEngine({
+    evaluators: [
+      createRbacEvaluator({ roles: { viewer: { permissions: ["invoice:read"] } } }),
+    ],
+  });
+  const request = {
+    subject: { id: "user:ana", roles: ["viewer"] },
+    action: "update",
+    resource: { type: "invoice" },
+    context: {},
+  };
+
+  expect(engine.evaluate(request).effect).toBe("deny");
+  expect(engine.explain(request).trace).toEqual([{ index: 0, outcome: "abstain" }]);
+});
+```
+
+### Load roles and relations from your backend
+
+Use the adapters to turn whatever your API returns into the shapes above: see [`@useguardril/adapters`](./packages/adapters).
 
 ## Typed actions and resources
 
@@ -242,9 +465,12 @@ Evaluation stops at the first evaluator that denies, throws, or misbehaves, so l
 **Seeing every decision.** `onDecision` is called after each one. Turn it on only where you want it:
 
 ```ts
+import { createAuthorizationStore, createEngine } from "@useguardril/core";
+
 const engine = createEngine({
   evaluators,
   // Every evaluation: request, decision, and per-evaluator trace.
+  // (`import.meta.env.DEV` is Vite's flag; use whatever tells you "development" in your build.)
   onDecision: import.meta.env.DEV
     ? ({ input, decision }) => console.debug("[authz]", input.action, input.resource.type, decision.code)
     : undefined,
@@ -337,7 +563,7 @@ All of these extend `AuthorizationError`, so one `instanceof` check catches them
 `message` (on errors) and `reason` (on decisions) are always in English. For any other language, use the stable `code` and `params` that come with every error and every built-in decision, and format the text yourself, with your own i18n library or a plain object:
 
 ```ts
-import { AuthorizationError, ERROR_CODES, type ErrorCode } from "@useguardril/core";
+import { AuthorizationError, createRbacEvaluator, type ErrorCode } from "@useguardril/core";
 
 const es: Partial<Record<ErrorCode, (p: Record<string, unknown>) => string>> = {
   ROLE_INHERITANCE_CYCLE: (p) => `Ciclo de herencia de roles: ${(p.cycle as string[]).join(" -> ")}.`,
