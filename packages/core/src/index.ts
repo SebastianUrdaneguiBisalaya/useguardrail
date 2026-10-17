@@ -31,13 +31,21 @@ export {
 export type {
   AbacConfig,
   AbacPolicy,
+  AllCondition,
+  AnyCondition,
   Condition,
   ConditionOperator,
+  FieldCondition,
+  NotCondition,
   PermissionString,
   RbacConfig,
   RoleDefinition,
 } from "./rules/index.js";
-export { createAbacEvaluator, createRbacEvaluator } from "./rules/index.js";
+export {
+  createAbacEvaluator,
+  createRbacEvaluator,
+  MAX_CONDITION_DEPTH,
+} from "./rules/index.js";
 export type { SchemaKit } from "./schema.js";
 export { forSchema } from "./schema.js";
 export type {
