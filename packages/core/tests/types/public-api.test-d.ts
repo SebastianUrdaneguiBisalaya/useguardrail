@@ -42,6 +42,8 @@ import type {
   Store,
   StoreDecisionEvent,
   Subject,
+  TenantRelationGraph,
+  TenantRelationGraphConfig,
 } from "../../src/index.js";
 import {
   type AdapterMappingError,
@@ -54,6 +56,7 @@ import {
   createRebacEvaluator,
   createRelationGraph,
   createStore,
+  createTenantRelationGraph,
   type DECISION_CODES,
   type ERROR_CODES,
   evaluateState,
@@ -383,3 +386,46 @@ export const badShape: Condition = {
   // @ts-expect-error not a field comparison, `all`, `any`, or `not`
   or: [],
 };
+
+// ---- Tenant relation graphs ----
+
+expectTypeOf<TenantRelationGraph["forTenant"]>().toEqualTypeOf<
+  (tenantId: string) => RelationGraph | undefined
+>();
+expectTypeOf<TenantRelationGraph["check"]>().toEqualTypeOf<
+  (
+    tenantId: string,
+    subject: string,
+    relation: string,
+    object: string,
+  ) => boolean
+>();
+expectTypeOf<TenantRelationGraph["tenants"]>().toEqualTypeOf<
+  () => readonly string[]
+>();
+expectTypeOf<TenantRelationGraphConfig["tuples"]>().toEqualTypeOf<
+  Readonly<Record<string, readonly RelationTuple[]>>
+>();
+expectTypeOf(
+  createTenantRelationGraph({
+    tuples: {},
+  }),
+).toEqualTypeOf<TenantRelationGraph>();
+
+// The evaluator accepts either kind of graph.
+declare const tenantGraph: TenantRelationGraph;
+declare const singleGraph: RelationGraph;
+export const forTenants = createRebacEvaluator({
+  graph: tenantGraph,
+  requirements: {},
+});
+export const forOne = createRebacEvaluator({
+  graph: singleGraph,
+  requirements: {},
+});
+
+createRebacEvaluator({
+  // @ts-expect-error a graph is required
+  graph: undefined,
+  requirements: {},
+});
