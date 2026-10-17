@@ -202,8 +202,8 @@ packages/
   adapters/               # @useguardril/adapters — backend response -> SDK contract
     src/
       index.ts
-      mapping/
-    tests/
+      mapping/            # path helpers, session/roles/tuples adapters
+    tests/                # mirrors src/ (+ tests/integration/ for adapters + core)
 ```
 
 - Per-package `tests/` mirror `src/` (section 1). There is no root `tests/`: each package owns its vitest config, so cross-package integration tests live in the consuming package (`packages/react/tests/integration/`, which resolves `@useguardril/core` to its source) and benchmarks live next to the code they measure (`packages/core/tests/performance/`, run with `pnpm --filter @useguardril/core run bench`).
