@@ -115,6 +115,81 @@ void store.load(async ({ signal }) => {
 
 `load` never rejects, applies subject, context, and engine atomically, and ignores stale results when called again (for example on a tenant switch). Details in the [core README](./packages/core/README.md#loading-state-async-data).
 
+## Typed actions and resources
+
+By default actions and resource types are plain strings. Declare a **schema** and the compiler checks them everywhere: permission strings, policy scopes, relation requirements, and every `can(...)` / `useCan(...)` / `<Can>`. A typo or an action on the wrong resource stops compiling.
+
+```ts
+// authorization.ts
+import { forSchema } from "@useguardril/core";
+
+// Resource type -> the actions it supports. Declare it with `type`, not `interface`.
+type AppSchema = {
+  invoice: "read" | "update" | "delete";
+  user: "read" | "invite";
+};
+
+export const auth = forSchema<AppSchema>();
+
+const rbac = auth.createRbacEvaluator({
+  roles: {
+    editor: { permissions: ["invoice:update", "user:*", "*:read"] },
+    // "invoice:invite"  -> compile error: invite is not an invoice action
+    // "order:read"      -> compile error: order is not in the schema
+  },
+});
+
+const abac = auth.createAbacEvaluator({
+  policies: [{ id: "no-delete", effect: "deny", actions: ["delete"], resources: ["invoice"] }],
+});
+
+const rebac = auth.createRebacEvaluator({
+  graph,
+  requirements: { invoice: { read: "viewer", update: "editor" }, user: { invite: "admin" } },
+});
+
+export const store = auth.createAuthorizationStore({
+  engine: auth.createEngine({ evaluators: [rbac, abac, rebac] }),
+  subject,
+});
+
+store.can("update", { type: "invoice", id }); // ok
+store.can("invite", { type: "invoice" }); // compile error
+store.can("read", { type: "order" }); // compile error
+```
+
+For React, bind the components once and import them from your own module:
+
+```tsx
+// authorization-ui.ts
+import { forSchema } from "@useguardril/react";
+import type { AppSchema } from "./authorization";
+
+export const { AuthorizationProvider, Can, useCan, useAccess } = forSchema<AppSchema>();
+
+// anywhere
+const canEdit = useCan("update", { type: "invoice", id });
+<Can action="invite" resource={{ type: "user" }}>...</Can>;
+<Can action="invite" resource={{ type: "invoice" }} />; // compile error
+```
+
+What is checked:
+
+| Where | What the schema enforces |
+|---|---|
+| RBAC `permissions` | `"*"`, `"<type>:<action>"`, `"<type>:*"`, `"*:<action>"`, using only the types and actions you declared |
+| ABAC `actions` / `resources` | Declared actions and resource types (or `"*"`) |
+| ReBAC `requirements` | Declared resource types, each with only its own actions |
+| `store.can` / `store.evaluate` / `engine.evaluate` | An action must belong to the resource type it is paired with |
+| `useCan` / `useAccess` / `<Can>` | Same, through `forSchema` from `@useguardril/react` |
+
+Good to know:
+
+- **It is compile-time only.** `forSchema` returns the very same functions; nothing is added at runtime. Plain JavaScript callers (or `as any` casts) are still validated at runtime, so a malformed permission still throws `InvalidPolicyError`.
+- **Schema-less evaluators mix in.** An evaluator built without a schema (for example from roles loaded by an adapter, where permissions are plain strings) is accepted by a typed engine and a typed store; it is simply not checked. The reverse is not allowed: a schema-bound evaluator does not fit an engine without that schema.
+- **Without `forSchema`** you can pass the type argument yourself (`createEngine<AppSchema>(...)`), and TypeScript infers the schema from a typed engine or evaluator (`createAuthorizationStore({ engine })`).
+- **Custom evaluators** typed as `Evaluator<AppSchema>` receive requests whose `action` and `resource.type` are consistent. TypeScript does not narrow `input.action` from `input.resource.type` (the discriminant is nested), so compare them yourself when you need to.
+
 ## Security model
 
 What the SDK defends against:
@@ -146,6 +221,7 @@ Rule of thumb: **mistakes in configuration throw when you create the engine, eva
 | An evaluator that throws, or returns a malformed decision | — | `deny`. The error detail is not exposed in the decision. |
 | An evaluator called directly (outside an engine or store) with a structurally invalid input | — | May throw a `TypeError`. The engine and the store catch it and deny, so always evaluate through one of them. |
 | ReBAC wildcard subjects (such as OpenFGA's `user:*`) | not supported | Kept as written and match nobody. |
+| Schema typing (`forSchema`) | compile-time only | No runtime effect: plain JavaScript callers are still validated when evaluators are created. |
 | Evaluation | synchronous only | There is no async evaluator. Fetch data with `store.load(...)` (see [Loading state](#loading-state)); until it arrives, every check is denied with code `LOADING`. |
 | A loader that throws or returns invalid data | — | The store goes to `"error"` and denies everything (`LOAD_FAILED`); `load` itself never rejects. |
 | A newer `store.load(...)` while one is running | — | The older load is aborted and its result ignored. |
