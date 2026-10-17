@@ -144,6 +144,36 @@ Two helpers exist for UI adapters and server rendering:
 - `store.getInitialSnapshot()` returns the state the store was **created** with; it never changes. React uses it as the server snapshot so server rendering and hydration agree.
 - `evaluateState(state, action, resource)` is the pure function behind `store.evaluate`: it evaluates against any state you pass in (for example `store.getInitialSnapshot()`) without touching the store. It never throws.
 
+## Typed schema (actions and resources)
+
+Declare which actions each resource type supports and the compiler checks every permission, policy scope, relation requirement, and `can(...)` call:
+
+```ts
+import { forSchema } from "@useguardril/core";
+
+type AppSchema = {
+  invoice: "read" | "update" | "delete";
+  user: "read" | "invite";
+};
+
+const auth = forSchema<AppSchema>();
+// auth.createEngine, createRbacEvaluator, createAbacEvaluator, createRebacEvaluator,
+// createAuthorizationStore: the same functions, with your schema applied to their types.
+```
+
+| Export | Purpose |
+|---|---|
+| `Schema` | The constraint a schema must satisfy: `Readonly<Record<string, string>>`. Declare yours with `type`, not `interface`. |
+| `forSchema<S>()` | Binds all factories to `S` in one place. |
+| `ResourceName<S>`, `ActionName<S>` | The resource types / all actions of a schema. |
+| `ResourceFor<T>` | A resource of type `T`: `{ type: T; id?; attributes? }`. |
+| `PermissionString<S>` | The permission strings valid for `S` (`"*"`, `"invoice:update"`, `"invoice:*"`, `"*:read"`, ...). |
+| `Engine<S>`, `Evaluator<S>`, `EvaluationInput<S>`, `AuthorizationStore<S>` | Schema-aware versions of the core types. Every one defaults to the loose schema (any string). |
+
+You can also pass the schema to each factory (`createEngine<AppSchema>({...})`), or let TypeScript infer it from a typed evaluator or engine. A schema-less evaluator is accepted next to typed ones (useful for roles loaded through an adapter, whose permissions are plain strings); a schema-bound evaluator is not accepted by an engine without that schema.
+
+The schema is **compile-time only**: nothing changes at runtime, and plain JavaScript callers are still validated. See the [root README](../../README.md#typed-actions-and-resources) for a full example and what is checked where.
+
 ## Loading state (async data)
 
 Evaluation is always **synchronous**. What is asynchronous is getting the data (the session, roles, tuples) from your backend. The store models that with a `status`:
