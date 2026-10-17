@@ -12,6 +12,7 @@ A frontend-first, framework-independent authorization SDK for TypeScript. Descri
 |---|---|
 | [`@useguardril/core`](./packages/core) | The engine: RBAC, ABAC, and ReBAC evaluators, multi-tenant context, and a reactive store. No UI dependencies, zero runtime dependencies. |
 | [`@useguardril/react`](./packages/react) | React adapter: `AuthorizationProvider`, `useCan`, `<Can>`. Re-renders a component only when its own answer changes. |
+| [`@useguardril/adapters`](./packages/adapters) | Normalizes backend responses (sessions, roles, OpenFGA and SpiceDB relation tuples) into the core contract. |
 
 ## Why useguardril
 
