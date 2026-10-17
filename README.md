@@ -190,6 +190,62 @@ Good to know:
 - **Without `forSchema`** you can pass the type argument yourself (`createEngine<AppSchema>(...)`), and TypeScript infers the schema from a typed engine or evaluator (`createAuthorizationStore({ engine })`).
 - **Custom evaluators** typed as `Evaluator<AppSchema>` receive requests whose `action` and `resource.type` are consistent. TypeScript does not narrow `input.action` from `input.resource.type` (the discriminant is nested), so compare them yourself when you need to.
 
+## Debugging and auditing
+
+The library never logs. Instead you can ask it **why** something was decided, or hand it a callback that receives every decision, and do whatever you want with it.
+
+**Why was this denied?** Ask the store (or the engine) to explain a check:
+
+```ts
+const { decision, status, trace } = store.explain("update", { type: "invoice", id: "42" });
+
+decision; // { effect: "deny", code: "DEFAULT_DENY", reason: "No evaluator granted access (default deny)." }
+status; // "ready"  (or "loading" / "error" when the data is not there yet)
+trace; // [ { index: 0, outcome: "abstain" }, { index: 1, outcome: "abstain" } ]
+```
+
+`trace` has one entry per evaluator that was consulted, in order, with what it answered:
+
+| `outcome` | Meaning |
+|---|---|
+| `"allow"` / `"deny"` | It returned that decision (`trace[i].decision`). |
+| `"abstain"` | It had no opinion. |
+| `"threw"` | It threw (`trace[i].error` holds what it threw; the decision itself never exposes it). |
+| `"malformed"` | It returned something that is not a decision. |
+
+Evaluation stops at the first evaluator that denies, throws, or misbehaves, so later evaluators do not appear. When the store is `"loading"`, in `"error"`, or has no subject, the engine is never consulted and `trace` is empty; the `decision.code` (`LOADING`, `LOAD_FAILED`, `NO_SUBJECT`) says why.
+
+**Seeing every decision.** `onDecision` is called after each one. Turn it on only where you want it:
+
+```ts
+const engine = createEngine({
+  evaluators,
+  // Every evaluation: request, decision, and per-evaluator trace.
+  onDecision: import.meta.env.DEV
+    ? ({ input, decision }) => console.debug("[authz]", input.action, input.resource.type, decision.code)
+    : undefined,
+});
+
+const store = createAuthorizationStore({
+  engine,
+  // Every check made through the store, including those that never reach the engine.
+  onDecision: ({ action, status, decision }) => audit.push({ action, status, code: decision.code }),
+});
+```
+
+| Hook | Fires on | Event |
+|---|---|---|
+| `createEngine({ onDecision })` | Every `engine.evaluate` / `engine.explain`, whoever calls it | `{ input, decision, trace }` |
+| `createAuthorizationStore({ onDecision })` | Every `store.can` / `evaluate` / `explain`, including checks denied while loading, failed, or signed out | `{ action, resource, subject, context, status, decision, trace }` |
+
+Things to know:
+
+- **It cannot change the decision.** The hook runs after the decision is made. If it throws, the decision is unaffected and the error is rethrown asynchronously (it shows up as an unhandled error; catch it with `window.addEventListener("error", ...)`).
+- **It fires on every check, not once per user action.** Components call `can` while rendering, so the same check can be reported several times per render (React may also render twice in `StrictMode`). It is for debugging and for inspecting decisions, not for counting what users did.
+- **Events contain the full request**, including subject and resource attributes. Redact them before sending them to a logging service.
+- **No cost when unused.** Without a hook, no trace is built.
+- **Client-side records can be tampered with** by whoever controls the browser (see [Security model](#security-model)). Audit what matters on the server.
+
 ## Security model
 
 What the SDK defends against:
@@ -218,6 +274,7 @@ Rule of thumb: **mistakes in configuration throw when you create the engine, eva
 | ABAC `gt` / `gte` / `lt` / `lte` | number vs number, or string vs string | Any other combination does not hold. |
 | ABAC conditions inside one policy | AND only | There is no OR inside a policy; write several policies instead (any matching `allow` grants, any matching `deny` wins). |
 | ReBAC resource without an `id`, or an action with no requirement | — | The evaluator has no opinion, so the result is `deny` unless another evaluator allows. |
+| An `onDecision` hook that throws | — | The decision is unaffected; the hook's error is rethrown asynchronously. |
 | An evaluator that throws, or returns a malformed decision | — | `deny`. The error detail is not exposed in the decision. |
 | An evaluator called directly (outside an engine or store) with a structurally invalid input | — | May throw a `TypeError`. The engine and the store catch it and deny, so always evaluate through one of them. |
 | ReBAC wildcard subjects (such as OpenFGA's `user:*`) | not supported | Kept as written and match nobody. |
@@ -305,7 +362,7 @@ const decision = store.evaluate("update", resource);
 
 | Area | Codes | Params |
 |---|---|---|
-| Context, subject, engine | `CONTEXT_NOT_OBJECT`, `CONTEXT_TENANT_ID_INVALID`, `CONTEXT_ATTRIBUTES_INVALID`, `SUBJECT_INVALID`, `ENGINE_REQUIRED`, `EVALUATORS_INVALID`, `LOADER_INVALID`, `LOAD_RESULT_INVALID` | — |
+| Context, subject, engine | `CONTEXT_NOT_OBJECT`, `CONTEXT_TENANT_ID_INVALID`, `CONTEXT_ATTRIBUTES_INVALID`, `SUBJECT_INVALID`, `ENGINE_REQUIRED`, `EVALUATORS_INVALID`, `LOADER_INVALID`, `LOAD_RESULT_INVALID`, `ON_DECISION_INVALID` | — |
 | RBAC | `RBAC_ROLES_INVALID` | — |
 | | `ROLE_NOT_OBJECT`, `ROLE_PERMISSIONS_INVALID`, `ROLE_INHERITS_INVALID` | `role` |
 | | `PERMISSION_NOT_STRING`, `PERMISSION_FORMAT_INVALID` | `role`, `index` |
