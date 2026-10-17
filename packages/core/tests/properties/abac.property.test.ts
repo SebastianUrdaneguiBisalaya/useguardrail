@@ -4,8 +4,13 @@ import type {
   AbacPolicy,
   Condition,
   EvaluationInput,
+  FieldCondition,
 } from "../../src/index.js";
-import { createAbacEvaluator, createEngine } from "../../src/index.js";
+import {
+  createAbacEvaluator,
+  createEngine,
+  InvalidPolicyError,
+} from "../../src/index.js";
 
 const FIELDS = [
   "subject.attributes.dept",
@@ -13,7 +18,7 @@ const FIELDS = [
   "context.attributes.level",
 ] as const;
 
-const conditionArb: fc.Arbitrary<Condition> = fc.oneof(
+const leafArb: fc.Arbitrary<FieldCondition> = fc.oneof(
   fc.record({
     field: fc.constant("subject.attributes.dept"),
     op: fc.constantFrom("eq", "neq", "contains"),
@@ -47,6 +52,34 @@ const conditionArb: fc.Arbitrary<Condition> = fc.oneof(
     valueFrom: fc.constant("resource.attributes.owner"),
   }),
 );
+
+/** Field comparisons combined with all / any / not, up to three levels deep. */
+const conditionArb: fc.Arbitrary<Condition> = fc.letrec<{
+  node: Condition;
+}>((tie) => ({
+  node: fc.oneof(
+    {
+      depthSize: "small",
+      maxDepth: 3,
+    },
+    leafArb,
+    fc.record({
+      all: fc.array(tie("node"), {
+        maxLength: 3,
+        minLength: 1,
+      }),
+    }),
+    fc.record({
+      any: fc.array(tie("node"), {
+        maxLength: 3,
+        minLength: 1,
+      }),
+    }),
+    fc.record({
+      not: tie("node"),
+    }),
+  ),
+})).node;
 
 const policiesArb = fc
   .array(
@@ -151,7 +184,10 @@ const lookup = (input: unknown, path: string): unknown =>
       input,
     );
 
-const holds = (condition: Condition, input: EvaluationInput): boolean => {
+const holdsField = (
+  condition: FieldCondition,
+  input: EvaluationInput,
+): boolean => {
   const left = lookup(input, condition.field);
   if (condition.op === "exists") {
     return (left !== undefined) === condition.value;
@@ -187,6 +223,19 @@ const holds = (condition: Condition, input: EvaluationInput): boolean => {
     default:
       return false;
   }
+};
+
+const holds = (condition: Condition, input: EvaluationInput): boolean => {
+  if ("all" in condition) {
+    return condition.all.every((child) => holds(child, input));
+  }
+  if ("any" in condition) {
+    return condition.any.some((child) => holds(child, input));
+  }
+  if ("not" in condition) {
+    return !holds(condition.not, input);
+  }
+  return holdsField(condition, input);
 };
 
 const inScope = (
@@ -331,6 +380,31 @@ describe("ABAC properties", () => {
       }),
       {
         numRuns: 200,
+      },
+    );
+  });
+
+  it("arbitrary JSON as a condition either compiles or throws InvalidPolicyError, never anything else", () => {
+    fc.assert(
+      fc.property(fc.anything(), (condition) => {
+        try {
+          createAbacEvaluator({
+            policies: [
+              {
+                conditions: [
+                  condition as never,
+                ],
+                effect: "allow",
+                id: "p",
+              },
+            ],
+          });
+        } catch (error) {
+          expect(error).toBeInstanceOf(InvalidPolicyError);
+        }
+      }),
+      {
+        numRuns: 500,
       },
     );
   });

@@ -8,6 +8,8 @@ import { expectTypeOf } from "vitest";
 import type {
   AbacPolicy,
   Action,
+  AllCondition,
+  AnyCondition,
   AuthorizationLoader,
   AuthorizationLoadResult,
   AuthorizationState,
@@ -28,7 +30,9 @@ import type {
   Evaluator,
   EvaluatorOutcome,
   EvaluatorTrace,
+  FieldCondition,
   MessageParams,
+  NotCondition,
   RbacConfig,
   RelationGraph,
   RelationGraphConfig,
@@ -55,6 +59,7 @@ import {
   evaluateState,
   type InvalidContextError,
   type InvalidPolicyError,
+  MAX_CONDITION_DEPTH,
 } from "../../src/index.js";
 
 declare const engine: Engine;
@@ -132,7 +137,7 @@ expectTypeOf<ConditionOperator>().toEqualTypeOf<
   | "exists"
 >();
 expectTypeOf<AbacPolicy["effect"]>().toEqualTypeOf<"allow" | "deny">();
-expectTypeOf<Condition["op"]>().toEqualTypeOf<ConditionOperator>();
+expectTypeOf<FieldCondition["op"]>().toEqualTypeOf<ConditionOperator>();
 
 // The factories are generic over a schema; without one they take and return the loose types.
 declare const looseEngine: Engine;
@@ -313,3 +318,68 @@ createEngine({
   // @ts-expect-error the hook receives an event, not a number
   onDecision: (event: number) => event,
 });
+
+// ---- ABAC condition groups ----
+
+expectTypeOf<AllCondition>().toEqualTypeOf<{
+  readonly all: readonly Condition[];
+}>();
+expectTypeOf<AnyCondition>().toEqualTypeOf<{
+  readonly any: readonly Condition[];
+}>();
+expectTypeOf<NotCondition>().toEqualTypeOf<{
+  readonly not: Condition;
+}>();
+expectTypeOf<Condition>().toEqualTypeOf<
+  FieldCondition | AllCondition | AnyCondition | NotCondition
+>();
+expectTypeOf(MAX_CONDITION_DEPTH).toBeNumber();
+
+export const tree: Condition = {
+  all: [
+    {
+      field: "subject.attributes.dept",
+      op: "eq",
+      value: "a",
+    },
+    {
+      not: {
+        any: [
+          {
+            field: "context.attributes.level",
+            op: "gt",
+            value: 2,
+          },
+          {
+            field: "resource.attributes.locked",
+            op: "exists",
+            value: true,
+          },
+        ],
+      },
+    },
+  ],
+};
+
+export const badAll: Condition = {
+  all: {
+    // @ts-expect-error `all` takes an array of conditions
+    field: "subject.id",
+    op: "eq",
+    value: "u",
+  },
+};
+export const badNot: Condition = {
+  // @ts-expect-error `not` takes exactly one condition
+  not: [
+    {
+      field: "subject.id",
+      op: "eq",
+      value: "u",
+    },
+  ],
+};
+export const badShape: Condition = {
+  // @ts-expect-error not a field comparison, `all`, `any`, or `not`
+  or: [],
+};
