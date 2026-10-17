@@ -107,6 +107,43 @@ return access === "allowed" ? <Invoice /> : <NoAccess />;
 
 Each hook re-renders only when its own value changes, so going from `"loading"` to `"allowed"` is a single re-render and never passes through `"denied"`.
 
+## Server-side rendering and hydration
+
+Works with Next.js, Remix, and any `renderToString` / streaming setup. Every hook passes `store.getInitialSnapshot()` to React as the server snapshot, so the server render and the first client render both use the store's **initial** state. Hydration therefore never mismatches, even if the client store already received data before React hydrated; React then re-renders with the live state.
+
+Consequences, and what to do:
+
+1. **Put the data in at creation, identically on the server and the client.** Fetch the session on the server and pass it down as plain props (a Server Component in Next.js), then create the store from it:
+
+   ```tsx
+   "use client";
+   import { createAuthorizationStore } from "@useguardril/core";
+   import { AuthorizationProvider } from "@useguardril/react";
+   import { useState, type ReactNode } from "react";
+
+   export function Providers({ session, children }: { session: Session; children: ReactNode }) {
+     // useState keeps one store per component instance, on the server and in the browser.
+     const [store] = useState(() =>
+       createAuthorizationStore({
+         engine,
+         subject: session.subject,
+         context: session.context,
+       }),
+     );
+     return <AuthorizationProvider store={store}>{children}</AuthorizationProvider>;
+   }
+   ```
+
+2. **Never create the store at module level on the server.** A server process serves many users; a module-level store would hand one user's subject to the next request. Create it per request (as above, inside the component, or in your request handler).
+3. **Changes after creation are not part of the server render.** `setSubject`, `setStatus`, and `load` change the live state (the client picks them up right after hydration), but the server renders what the store was created with. Do not call `load` on the server: rendering is synchronous. Use `status: "loading"` with `<Can loading>` only for client-side fetching.
+4. Client-only apps (Vite, CRA) need nothing special.
+
+## React versions, StrictMode, and concurrent rendering
+
+- Supported: React 18 and 19. CI runs the adapter's checks against React 19 and React 18.3.
+- Safe in `StrictMode`: subscriptions are balanced across the double-invoked effects and released on unmount.
+- Safe with concurrent features (`startTransition`, `useDeferredValue`, Suspense): the hooks use `useSyncExternalStore`, so a render never reads two different store states (no tearing). Store updates are always applied synchronously, as `useSyncExternalStore` requires.
+
 ## Errors
 
 Using a hook or component outside an `AuthorizationProvider` throws `MissingProviderError`, which extends `AuthorizationError` from `@useguardril/core`.

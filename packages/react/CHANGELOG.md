@@ -6,6 +6,8 @@ All notable changes to `@useguardril/react` are documented here. This project fo
 
 ### Added
 
+- Hooks use the store's initial snapshot as the server snapshot: hydration never mismatches. Tested for server rendering, hydration, `StrictMode`, and concurrent rendering; CI also runs the package against React 18.
+
 - `useAccess` (`"loading" | "allowed" | "denied"`), `useAuthorizationStatus`, `useAuthorizationError`, and a `loading` prop on `<Can>`.
 
 - `AuthorizationProvider`, `useAuthorizationStore`, `useCan`, `useSubject`, and `<Can>`.
