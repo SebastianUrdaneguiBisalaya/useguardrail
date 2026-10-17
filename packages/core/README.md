@@ -54,7 +54,7 @@ Permissions are `"<resourceType>:<action>"`; either side may be `"*"`, and `"*"`
 
 ### ABAC: `createAbacEvaluator`
 
-Policies with `allow`/`deny` effects, optional `actions` and `resources` scopes, and conditions that must all hold. A `field` is a dot path starting at `subject`, `action`, `resource`, or `context`; compare it with a literal `value` or another field through `valueFrom`.
+Policies with `allow`/`deny` effects, optional `actions` and `resources` scopes, and `conditions`. The policy's top-level `conditions` must all hold (AND); use `any` and `not` inside them for OR and NOT. A `field` is a dot path starting at `subject`, `action`, `resource`, or `context`; compare it with a literal `value` or another field through `valueFrom`.
 
 ```ts
 import { createAbacEvaluator } from "@useguardril/core";
@@ -80,6 +80,42 @@ const abac = createAbacEvaluator({
 ```
 
 Operators: `eq`, `neq`, `in`, `nin`, `gt`, `gte`, `lt`, `lte`, `contains`, `exists`. If either side of a comparison is missing, the condition does not hold. Paths only read own properties, so the prototype chain is unreachable.
+
+#### Combining conditions: `all`, `any`, `not`
+
+A condition is either a field comparison or a group, and groups nest:
+
+| Condition | Holds when |
+|---|---|
+| `{ field, op, value \| valueFrom }` | The comparison holds. |
+| `{ all: [c1, c2, ...] }` | Every child holds (AND). |
+| `{ any: [c1, c2, ...] }` | At least one child holds (OR). |
+| `{ not: c }` | The child does **not** hold. |
+
+```ts
+{
+  id: "staff-read-unlocked",
+  effect: "allow",
+  actions: ["read"],
+  conditions: [
+    // (department is sales OR support) AND NOT locked
+    {
+      all: [
+        { any: [
+          { field: "subject.attributes.department", op: "eq", value: "sales" },
+          { field: "subject.attributes.department", op: "eq", value: "support" },
+        ] },
+        { not: { field: "resource.attributes.locked", op: "eq", value: true } },
+      ],
+    },
+  ],
+}
+```
+
+- `all` and `any` need a **non-empty** array (an empty one is rejected, so it can never mean "always true" by accident). A node must be exactly one of a comparison, `all`, `any`, or `not`.
+- **Nesting is limited to `MAX_CONDITION_DEPTH` (8) levels**; deeper conditions are rejected when the evaluator is created.
+- **`not` and missing values:** a comparison that fails only because a value is missing becomes true under `not`, so `{ not: { field: "subject.attributes.role", op: "eq", value: "guest" } }` is also true for a subject with no `role`. Prefer positive conditions in `allow` policies, and express exclusions as `deny` policies.
+- The decision is unchanged: a matching `deny` policy still wins, and the decision `code` is still `POLICY_ALLOWS` / `POLICY_DENIES` with the `policyId`. `engine.explain` shows which policy decided.
 
 ### ReBAC: `createRelationGraph` + `createRebacEvaluator`
 
