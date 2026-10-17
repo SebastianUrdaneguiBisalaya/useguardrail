@@ -4,6 +4,10 @@ All notable changes to `@useguardril/core` are documented here. This project fol
 
 ## 0.1.0 (unreleased)
 
+### Security
+
+- Optional inputs (`subject.roles`, `resource.id`, `context.tenantId`, `context.attributes`) and the subject `id` are read as own properties, so a polluted `Object.prototype` cannot grant roles, a tenant, or an identity.
+
 ### Added
 
 - `createEngine`: combines evaluators with deny-overrides and default-deny, failing closed.
@@ -12,4 +16,5 @@ All notable changes to `@useguardril/core` are documented here. This project fol
 - `createRelationGraph` and `createRebacEvaluator`: relation tuples, usersets, implied relations, and inheritance.
 - `createContext`: validated, frozen multi-tenant evaluation context.
 - `createStore` and `createAuthorizationStore`: reactive stores compatible with `useSyncExternalStore`.
+- Stable `code` and `params` on every error (`AuthorizationError.code`, `.params`) and on every built-in decision (`Decision.code`, `.params`), plus `ERROR_CODES` and `DECISION_CODES`, so messages can be localized.
 - Typed errors: `AuthorizationError`, `InvalidPolicyError`, `InvalidContextError`, `AdapterMappingError`.

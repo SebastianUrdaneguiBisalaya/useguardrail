@@ -159,6 +159,10 @@ try {
 }
 ```
 
+## Localizing messages
+
+`message` and `reason` are always English. Every error has a stable `code` and `params` (and every built-in decision has `code` and `params` too), so you can show text in your own language. `ERROR_CODES` and `DECISION_CODES` list them all; see the [root README](../../README.md#error-codes-and-localization) for the full tables and an example.
+
 ## License
 
 [ISC](../../LICENSE)

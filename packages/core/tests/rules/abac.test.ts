@@ -305,7 +305,7 @@ describe("createAbacEvaluator", () => {
         id: "no-open",
       },
     );
-    expect(e(input())).toEqual({
+    expect(e(input())).toMatchObject({
       effect: "deny",
       reason: 'Policy "no-open" denies access.',
     });
@@ -367,7 +367,7 @@ describe("createAbacEvaluator", () => {
         ],
       },
     );
-    expect(e(input())).toEqual({
+    expect(e(input())).toMatchObject({
       effect: "allow",
       reason: 'Policy "first-any" allows access.',
     });
@@ -377,7 +377,7 @@ describe("createAbacEvaluator", () => {
           action: "delete",
         }),
       ),
-    ).toEqual({
+    ).toMatchObject({
       effect: "deny",
       reason: 'Policy "delete-deny" denies access.',
     });
