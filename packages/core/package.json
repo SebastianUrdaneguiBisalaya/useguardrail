@@ -1,0 +1,58 @@
+{
+  "name": "node-sdk-template",
+  "version": "0.1.0",
+  "description": "Template for a Node.js SDK in TypeScript wrapping a third-party HTTP API, with dual ESM/CJS support.",
+  "keywords": [
+    "sdk",
+    "typescript",
+    "template",
+    "tsup",
+    "esm",
+    "cjs"
+  ],
+  "license": "ISC",
+  "author": "",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.3.4"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "tsup": "8.5.1",
+    "tsx": "4.23.13",
+    "typescript": "5.7.3",
+    "vitest": "4.1.11"
+  }
+}

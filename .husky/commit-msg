@@ -1,0 +1,13 @@
+commit_msg_file="$1"
+commit_msg=$(head -n 1 "$commit_msg_file")
+pattern="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9./_-]+\))?!?: .+"
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+  echo "Commit message does not follow Conventional Commits:"
+  echo "  $commit_msg"
+  echo ""
+  echo "Expected format: <type>(<optional scope>): <description>"
+  echo "Allowed types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+  echo "Example: feat(charges): add support for partial refunds"
+  exit 1
+fi

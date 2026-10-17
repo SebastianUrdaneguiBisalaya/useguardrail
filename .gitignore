@@ -1,0 +1,9 @@
+# ignored in every package of the workspace (packages/*, apps/*, and the root)
+**/node_modules
+**/dist
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
