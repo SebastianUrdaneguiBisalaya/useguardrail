@@ -139,6 +139,11 @@ store.setSubject(undefined); // signed out: everything is denied
 
 `createStore` is also exported if you need a plain reactive store.
 
+Two helpers exist for UI adapters and server rendering:
+
+- `store.getInitialSnapshot()` returns the state the store was **created** with; it never changes. React uses it as the server snapshot so server rendering and hydration agree.
+- `evaluateState(state, action, resource)` is the pure function behind `store.evaluate`: it evaluates against any state you pass in (for example `store.getInitialSnapshot()`) without touching the store. It never throws.
+
 ## Loading state (async data)
 
 Evaluation is always **synchronous**. What is asynchronous is getting the data (the session, roles, tuples) from your backend. The store models that with a `status`:
