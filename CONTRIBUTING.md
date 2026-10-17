@@ -20,8 +20,6 @@ packages/
   core/       # @useguardril/core: engine, RBAC/ABAC/ReBAC evaluators, context, store
   react/      # @useguardril/react: provider, hooks, <Can>
   adapters/   # @useguardril/adapters: backend responses -> core contract
-apps/
-  website/    # documentation website
 ```
 
 Dependencies point one way: `react` and `adapters` depend on `core`; `core` depends on neither. Each package has its own `src/`, `tests/`, `README.md`, and `CHANGELOG.md`.

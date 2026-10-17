@@ -73,9 +73,10 @@ This is achieved by:
 
 ### CI publish flow (`.github/workflows/publish.yml`)
 
-- **Trigger**: a GitHub Release being published (`release: types: [published]`). Merging to `main` does **not** publish anything by itself — publishing is a separate, deliberate step: bump `version` in `package.json` (following semver, see section 4), merge that to `main`, then create a GitHub Release (tag matching the new version is recommended, e.g. `v1.2.0`) to trigger the actual npm publish.
+- **Trigger**: every push to `main` (`push: branches: [main]`). Publishing is still deliberate: a push only publishes a package whose `version` is not yet on the registry, so to release, bump `version` in that package's `package.json` (following semver, see section 4) in the PR you merge to `main`. Pushing to `main` without a version bump publishes nothing.
 - **Gate**: `typecheck` → `lint` → `test` → `build` must all pass before publishing is attempted.
-- **Version guard**: before publishing, the workflow checks `npm view <name>@<version>` against the current `package.json` version and skips the publish step if that version is already on the registry — a safety net in case a release is edited/republished without a version bump.
+- **Packages and order**: the workflow publishes `core`, then `react`, then `adapters` (the last two depend on `core`). A package is skipped if it is `"private": true` or if `npm view <name>@<version>` shows its current version is already on the registry, so each package is released independently by bumping only its own version.
+- **Concurrency**: runs for the same ref are serialized (`concurrency`), and a running publish is never cancelled.
 - **Required GitHub secret**: `NPM_TOKEN`.
   - Generate it on [npmjs.com](https://www.npmjs.com) → avatar → *Access Tokens* → *Generate New Token* → **Automation** type (this type is meant for CI and bypasses the 2FA-for-publish prompt; it must have publish permission on this package/scope).
   - Configure it in GitHub at: repository → **Settings** → **Secrets and variables** → **Actions** → **New repository secret** → name it exactly `NPM_TOKEN`, paste the token value.
@@ -155,12 +156,6 @@ pnpm-workspace.yaml
 - The publish gate from section 3 (`typecheck` → `lint` → `test` → `build`) still applies, run across the whole workspace (`pnpm -r run typecheck`, etc.) before any package is published.
 - If the SDK has no pluggable providers, skip this section entirely and keep the single-package layout from section 0/1.
 
-## 10. Documentation website
-
-- This template does not ship a documentation website by default. If one is added later (Docusaurus, Nextra, VitePress, etc.), give it its own top-level directory — `apps/website/` if the repo already has the `apps/*` + `packages/*` split (add `apps/*` back to `pnpm-workspace.yaml`), or a plain `website/` at the repo root (sibling to `packages/`) otherwise.
-- The website must never be published to npm: keep it out of every package's `files` field / add it to `.npmignore` so it can't leak into a published tarball.
-- Deploy the website independently of the SDK's npm release (its own CI job/workflow) — docs can and should ship more often than the package itself (e.g. after a README/example fix that doesn't warrant a version bump).
-
 ---
 
 # Project context: `useguardril` — frontend-first authorization SDK
@@ -175,11 +170,9 @@ pnpm-workspace.yaml
 
 ## 1. Workspace layout
 
-Adapted to the existing repo (`packages/*` + `apps/*` in `pnpm-workspace.yaml`):
+Adapted to the existing repo (`packages/*` in `pnpm-workspace.yaml`):
 
 ```
-apps/
-  website/                # docs website (section 10), already present
 packages/
   core/                   # @useguardril/core — framework-independent engine
     src/
@@ -207,7 +200,7 @@ packages/
 ```
 
 - Per-package `tests/` mirror `src/` (section 1). There is no root `tests/`: each package owns its vitest config, so cross-package integration tests live in the consuming package (`packages/react/tests/integration/`, which resolves `@useguardril/core` to its source) and benchmarks live next to the code they measure (`packages/core/tests/performance/`, run with `pnpm --filter @useguardril/core run bench`).
-- `apps/*` are never published. `biome.json` lives at the repo root; each package owns its own `tsconfig.base.json` (extended by its `tsconfig.json`) and `vitest.config.ts`.
+- `biome.json` lives at the repo root; each package owns its own `tsconfig.base.json` (extended by its `tsconfig.json`) and `vitest.config.ts`.
 - Start with these three packages. Each ships its own unit tests; `core` + `react` also get integration tests. There is no separate testing package: test factories and fixtures live in each package's `tests/`.
 
 ## 2. Package responsibilities
