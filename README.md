@@ -254,7 +254,7 @@ pnpm --filter @useguardril/core run bench
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md). Project standards live in [AGENTS.md](./AGENTS.md).
+See [CONTRIBUTING.md](./CONTRIBUTING.md) and the [Code of Conduct](./CODE_OF_CONDUCT.md). Project standards live in [AGENTS.md](./AGENTS.md).
 
 ## License
 
