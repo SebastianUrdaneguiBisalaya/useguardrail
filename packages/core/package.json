@@ -9,7 +9,6 @@
     "abac",
     "permissions",
     "typescript",
-    "tsup",
     "esm",
     "cjs"
   ],

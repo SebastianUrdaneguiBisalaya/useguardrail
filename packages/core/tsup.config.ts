@@ -27,7 +27,7 @@ export default defineConfig({
     };
   },
 
-  platform: "node",
+  platform: "neutral",
 
   skipNodeModulesBundle: true,
 
