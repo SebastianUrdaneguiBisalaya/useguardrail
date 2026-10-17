@@ -272,7 +272,8 @@ Rule of thumb: **mistakes in configuration throw when you create the engine, eva
 | ABAC scope index cache | 1,024 `(action, resource type)` pairs per evaluator | The cache is cleared and rebuilt. Only affects speed, never decisions. |
 | ABAC condition values that are missing | — | The condition does not hold. A missing field never matches, not even `neq`. |
 | ABAC `gt` / `gte` / `lt` / `lte` | number vs number, or string vs string | Any other combination does not hold. |
-| ABAC conditions inside one policy | AND only | There is no OR inside a policy; write several policies instead (any matching `allow` grants, any matching `deny` wins). |
+| ABAC conditions nesting (`all` / `any` / `not`) | 8 levels (`MAX_CONDITION_DEPTH`) | Deeper conditions throw `InvalidPolicyError` (`CONDITION_TOO_DEEP`) when the evaluator is created. |
+| ABAC `not` over a missing value | — | The comparison fails because the value is missing, so `not` makes it true. Prefer positive conditions in `allow` policies and use `deny` policies for exclusions. |
 | ReBAC resource without an `id`, or an action with no requirement | — | The evaluator has no opinion, so the result is `deny` unless another evaluator allows. |
 | An `onDecision` hook that throws | — | The decision is unaffected; the hook's error is rethrown asynchronously. |
 | An evaluator that throws, or returns a malformed decision | — | `deny`. The error detail is not exposed in the decision. |
@@ -370,7 +371,9 @@ const decision = store.evaluate("update", resource);
 | | `ROLE_INHERITS_UNKNOWN` | `role`, `inherited` |
 | ABAC | `ABAC_POLICIES_INVALID` | — |
 | | `POLICY_NOT_OBJECT`, `POLICY_ID_INVALID` | `index` |
-| | `POLICY_ID_DUPLICATE`, `POLICY_EFFECT_INVALID`, `POLICY_CONDITIONS_INVALID`, `CONDITION_NOT_OBJECT`, `CONDITION_EXISTS_INVALID`, `CONDITION_VALUE_SOURCE_INVALID` | `policyId` |
+| | `POLICY_ID_DUPLICATE`, `POLICY_EFFECT_INVALID`, `POLICY_CONDITIONS_INVALID`, `CONDITION_NOT_OBJECT`, `CONDITION_SHAPE_INVALID`, `CONDITION_EXISTS_INVALID`, `CONDITION_VALUE_SOURCE_INVALID` | `policyId` |
+| | `CONDITION_GROUP_INVALID` | `policyId`, `operator` (`all` or `any`) |
+| | `CONDITION_TOO_DEEP` | `policyId`, `maxDepth` |
 | | `POLICY_SCOPE_INVALID` | `policyId`, `option` |
 | | `CONDITION_OPERATOR_UNKNOWN`, `CONDITION_ARRAY_REQUIRED` | `policyId`, `operator` |
 | | `CONDITION_FIELD_INVALID` | `policyId`, `field` |
@@ -407,7 +410,7 @@ Measured with `vitest bench` on an Apple M2 (Node 24). Each row is the mean time
 What this means:
 
 - **The index pays off when policies are spread across resources and actions**, which is how real policy sets look. The worst case, where every policy is in scope and its conditions must be checked, is linear in the number of policies (about 50 ns each) and gains only a little.
-- **Construction is cheap and happens once:** building 500 roles takes about 0.34 ms, compiling 1,000 ABAC policies about 0.35 ms, and indexing 5,014 relation tuples about 1 ms.
+- **Construction is cheap and happens once:** building 500 roles takes about 0.34 ms, compiling 1,000 ABAC policies about 0.65 ms, and indexing 5,014 relation tuples about 1 ms.
 - **Evaluation cost is not what limits a UI.** A screen with dozens of `useCan` calls spends well under a frame on re-evaluation. The 140 ms row is a deliberately extreme case with 1,000 simultaneous subscribers.
 - Differences under roughly 5% between runs are noise.
 
