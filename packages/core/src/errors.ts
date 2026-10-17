@@ -21,3 +21,11 @@ export class AdapterMappingError extends AuthorizationError {
     this.name = "AdapterMappingError";
   }
 }
+
+/** Thrown when a subject or context passed to the SDK is malformed. */
+export class InvalidContextError extends AuthorizationError {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = "InvalidContextError";
+  }
+}
