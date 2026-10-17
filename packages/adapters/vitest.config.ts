@@ -4,12 +4,20 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@useguardril/core": fileURLToPath(
+      "@useguardrail/core": fileURLToPath(
         new URL("../core/src/index.ts", import.meta.url),
       ),
     },
   },
   test: {
+    coverage: {
+      include: [
+        "src/**",
+      ],
+      reporter: [
+        "text",
+      ],
+    },
     passWithNoTests: true,
   },
 });

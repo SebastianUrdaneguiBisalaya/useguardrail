@@ -1,4 +1,4 @@
-import type { AuthorizationStore } from "@useguardril/core";
+import type { AuthorizationStore, Schema } from "@useguardrail/core";
 import type { ReactElement, ReactNode } from "react";
 import { createContext, useContext } from "react";
 import { MissingProviderError } from "../errors.js";
@@ -6,9 +6,9 @@ import { MissingProviderError } from "../errors.js";
 const AuthorizationContext = createContext<AuthorizationStore | null>(null);
 
 /** Props for {@link AuthorizationProvider}. */
-export type AuthorizationProviderProps = {
-  /** The store created with `createAuthorizationStore` from `@useguardril/core`. */
-  readonly store: AuthorizationStore;
+export type AuthorizationProviderProps<S extends Schema = Schema> = {
+  /** The store created with `createAuthorizationStore` from `@useguardrail/core`. */
+  readonly store: AuthorizationStore<S> | AuthorizationStore;
   readonly children?: ReactNode;
 };
 
@@ -21,12 +21,15 @@ export type AuthorizationProviderProps = {
  *   <App />
  * </AuthorizationProvider>
  */
-export function AuthorizationProvider({
+export function AuthorizationProvider<S extends Schema = Schema>({
   children,
   store,
-}: AuthorizationProviderProps): ReactElement {
+}: AuthorizationProviderProps<S>): ReactElement {
   return (
-    <AuthorizationContext.Provider value={store}>
+    // The context is schema-agnostic at runtime; `forSchema` restores the schema in the types.
+    <AuthorizationContext.Provider
+      value={store as unknown as AuthorizationStore}
+    >
       {children}
     </AuthorizationContext.Provider>
   );

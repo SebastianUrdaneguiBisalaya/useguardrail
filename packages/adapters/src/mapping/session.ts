@@ -1,5 +1,5 @@
-import type { Attributes, Context, Subject } from "@useguardril/core";
-import { AdapterMappingError } from "@useguardril/core";
+import type { Attributes, Context, Subject } from "@useguardrail/core";
+import { AdapterMappingError } from "@useguardrail/core";
 import type { Path } from "./path.js";
 import { compilePath, readPath, toIdentifier } from "./path.js";
 import type { Adapter } from "./types.js";

@@ -1,7 +1,7 @@
 {
-  "name": "@useguardril/adapters",
+  "name": "@useguardrail/adapters",
   "version": "0.1.0",
-  "description": "Adapters that normalize backend responses (sessions, roles, relation tuples) into the @useguardril/core contract.",
+  "description": "Adapters that normalize backend responses (sessions, roles, relation tuples) into the @useguardrail/core contract.",
   "keywords": [
     "authorization",
     "rbac",
@@ -20,6 +20,15 @@
     "url": "https://www.sebastianurdanegui.com/"
   },
   "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SebastianUrdaneguiBisalaya/useguardrail.git",
+    "directory": "packages/adapters"
+  },
+  "homepage": "https://github.com/SebastianUrdaneguiBisalaya/useguardrail/tree/main/packages/adapters#readme",
+  "bugs": {
+    "url": "https://github.com/SebastianUrdaneguiBisalaya/useguardrail/issues"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -47,6 +56,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
     "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "publishConfig": {
@@ -62,10 +72,12 @@
     "node": ">=18.0.0"
   },
   "peerDependencies": {
-    "@useguardril/core": "workspace:^"
+    "@useguardrail/core": "workspace:^"
   },
   "devDependencies": {
-    "@useguardril/core": "workspace:*",
+    "@useguardrail/core": "workspace:*",
+    "@vitest/coverage-v8": "4.1.11",
+    "fast-check": "4.10.2",
     "tsup": "8.5.1",
     "typescript": "5.7.3",
     "vitest": "4.1.11"

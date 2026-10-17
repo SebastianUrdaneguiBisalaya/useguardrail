@@ -1,3 +1,5 @@
+import { rethrowAsync } from "../report.js";
+
 /** Called after the store's state changes. */
 export type Listener = () => void;
 
@@ -12,6 +14,12 @@ export type Unsubscribe = () => void;
 export type Store<T> = {
   /** The current state. Same reference until the state changes. */
   readonly getSnapshot: () => T;
+  /**
+   * The state the store was created with, which never changes. Server rendering and
+   * hydration use it as the "server snapshot", so a client store that already received data
+   * before hydration still matches the HTML the server produced.
+   */
+  readonly getInitialSnapshot: () => T;
   /**
    * Replaces the state with a value, or with the result of an updater.
    * Setting a value identical (`Object.is`) to the current one notifies nobody.
@@ -47,6 +55,7 @@ export function createStore<T>(initial: T): Store<T> {
   const listeners = new Set<Listener>();
 
   const getSnapshot = (): T => state;
+  const getInitialSnapshot = (): T => initial;
 
   const setState = (next: T | ((previous: T) => T)): void => {
     const value =
@@ -64,9 +73,7 @@ export function createStore<T>(initial: T): Store<T> {
       try {
         listener();
       } catch (error) {
-        queueMicrotask(() => {
-          throw error;
-        });
+        rethrowAsync(error);
       }
     }
   };
@@ -95,6 +102,7 @@ export function createStore<T>(initial: T): Store<T> {
   };
 
   return Object.freeze({
+    getInitialSnapshot,
     getSnapshot,
     setState,
     subscribe,

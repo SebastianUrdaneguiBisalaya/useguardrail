@@ -12,7 +12,7 @@ export default defineConfig({
   },
 
   external: [
-    "@useguardril/core",
+    "@useguardrail/core",
   ],
 
   format: [

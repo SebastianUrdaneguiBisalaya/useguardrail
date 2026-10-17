@@ -1,6 +1,6 @@
-import type { Action, Resource } from "@useguardril/core";
+import type { Action, Resource } from "@useguardrail/core";
 import type { ReactElement, ReactNode } from "react";
-import { useCan } from "../hooks/index.js";
+import { useAccess } from "../hooks/index.js";
 
 /** Props for {@link Can}. */
 export type CanProps = {
@@ -10,6 +10,11 @@ export type CanProps = {
   readonly children?: ReactNode;
   /** Rendered when the subject is not allowed. Defaults to nothing. */
   readonly fallback?: ReactNode;
+  /**
+   * Rendered while the authorization data is still loading. Defaults to `fallback`, so
+   * without it the component behaves as "denied" until the data arrives.
+   */
+  readonly loading?: ReactNode;
 };
 
 /**
@@ -19,7 +24,12 @@ export type CanProps = {
  * @throws {MissingProviderError} When used outside an `AuthorizationProvider`.
  *
  * @example
- * <Can action="update" resource={{ type: "invoice", id }} fallback={<ReadOnlyBadge />}>
+ * <Can
+ *   action="update"
+ *   resource={{ type: "invoice", id }}
+ *   loading={<Skeleton />}
+ *   fallback={<ReadOnlyBadge />}
+ * >
  *   <EditButton />
  * </Can>
  */
@@ -27,8 +37,12 @@ export function Can({
   action,
   children,
   fallback = null,
+  loading = fallback,
   resource,
 }: CanProps): ReactElement {
-  const allowed = useCan(action, resource);
-  return <>{allowed ? children : fallback}</>;
+  const access = useAccess(action, resource);
+  if (access === "loading") {
+    return <>{loading}</>;
+  }
+  return <>{access === "allowed" ? children : fallback}</>;
 }

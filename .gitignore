@@ -1,6 +1,7 @@
-# ignored in every package of the workspace (packages/*, apps/*, and the root)
+# ignored in every package of the workspace (packages/* and the root)
 **/node_modules
 **/dist
+**/coverage
 
 .env
 .env.local

@@ -1,8 +1,13 @@
 name: Publish to npm
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+
+# Never run two publishes at once, and never cancel one that is already running.
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -19,7 +24,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 11.1.1
+          version: 12.3.4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -42,20 +47,27 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Check if this version is already published
-        id: version-check
-        run: |
-          PKG_NAME=$(node -p "require('./packages/core/package.json').name")
-          PKG_VERSION=$(node -p "require('./packages/core/package.json').version")
-          if npm view "$PKG_NAME@$PKG_VERSION" version >/dev/null 2>&1; then
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "published=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish to npm
-        if: steps.version-check.outputs.published == 'false'
-        working-directory: packages/core
-        run: pnpm publish --access public --no-git-checks --provenance
+      # Publishes core first, because react and adapters depend on it.
+      # A package is skipped when it is private or its current version is already on the registry,
+      # so pushing to main without bumping a version publishes nothing.
+      - name: Publish packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for dir in core react adapters; do
+            name=$(node -p "require('./packages/$dir/package.json').name")
+            version=$(node -p "require('./packages/$dir/package.json').version")
+            private=$(node -p "require('./packages/$dir/package.json').private === true")
+
+            if [ "$private" = "true" ]; then
+              echo "Skipping $name: package is private."
+              continue
+            fi
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "Skipping $name@$version: already published."
+              continue
+            fi
+
+            echo "Publishing $name@$version"
+            (cd "packages/$dir" && pnpm publish --access public --no-git-checks --provenance)
+          done

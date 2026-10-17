@@ -1,5 +1,5 @@
-import type { ErrorDetails } from "@useguardril/core";
-import { AuthorizationError } from "@useguardril/core";
+import type { ErrorDetails } from "@useguardrail/core";
+import { AuthorizationError } from "@useguardrail/core";
 
 /** Thrown when a hook or component is used outside an `AuthorizationProvider`. */
 export class MissingProviderError extends AuthorizationError {

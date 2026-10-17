@@ -1,5 +1,5 @@
 {
-  "name": "@useguardril/core",
+  "name": "@useguardrail/core",
   "version": "0.1.0",
   "description": "Framework-independent authorization engine (RBAC, ReBAC, ABAC) with a reactive store, with dual ESM/CJS support.",
   "keywords": [
@@ -18,6 +18,15 @@
     "url": "https://www.sebastianurdanegui.com/"
   },
   "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SebastianUrdaneguiBisalaya/useguardrail.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/SebastianUrdaneguiBisalaya/useguardrail/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/SebastianUrdaneguiBisalaya/useguardrail/issues"
+  },
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -46,6 +55,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
     "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "publishConfig": {
@@ -61,6 +71,8 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "4.1.11",
+    "fast-check": "4.10.2",
     "tsup": "8.5.1",
     "tsx": "4.23.13",
     "typescript": "5.7.3",

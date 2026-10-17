@@ -1,7 +1,7 @@
 import type { MessageParams } from "./types/index.js";
 
 /**
- * Every stable error `code` the SDK can produce, across all `@useguardril/*` packages.
+ * Every stable error `code` the SDK can produce, across all `@useguardrail/*` packages.
  * Codes never change meaning, so you can translate them with your own i18n catalog:
  * look up `error.code` and fill in `error.params`.
  */
@@ -17,7 +17,10 @@ export const ERROR_CODES = [
   "CONTEXT_ATTRIBUTES_INVALID",
   "SUBJECT_INVALID",
   "ENGINE_REQUIRED",
+  "LOADER_INVALID",
+  "LOAD_RESULT_INVALID",
   "EVALUATORS_INVALID",
+  "ON_DECISION_INVALID",
   // RBAC.
   "RBAC_ROLES_INVALID",
   "ROLE_NOT_OBJECT",
@@ -36,6 +39,9 @@ export const ERROR_CODES = [
   "POLICY_CONDITIONS_INVALID",
   "POLICY_SCOPE_INVALID",
   "CONDITION_NOT_OBJECT",
+  "CONDITION_SHAPE_INVALID",
+  "CONDITION_GROUP_INVALID",
+  "CONDITION_TOO_DEEP",
   "CONDITION_OPERATOR_UNKNOWN",
   "CONDITION_FIELD_INVALID",
   "CONDITION_EXISTS_INVALID",
@@ -51,13 +57,15 @@ export const ERROR_CODES = [
   "RULE_IMPLIED_BY_INVALID",
   "RULE_INHERIT_FROM_INVALID",
   "GRAPH_MAX_DEPTH_INVALID",
+  "TENANT_GRAPH_INVALID",
+  "TENANT_ID_INVALID",
   "REBAC_GRAPH_REQUIRED",
   "REBAC_REQUIREMENTS_INVALID",
   "REBAC_REQUIREMENT_TYPE_INVALID",
   "REBAC_REQUIREMENT_INVALID",
-  // @useguardril/react.
+  // @useguardrail/react.
   "PROVIDER_MISSING",
-  // @useguardril/adapters.
+  // @useguardrail/adapters.
   "ADAPTER_PATH_INVALID",
   "ADAPTER_LIST_NOT_ARRAY",
   "ADAPTER_STRING_LIST_INVALID",
@@ -88,7 +96,7 @@ export type ErrorDetails = {
 };
 
 /**
- * Base class for every error thrown by `@useguardril/*`. Use `instanceof` to narrow, and
+ * Base class for every error thrown by `@useguardrail/*`. Use `instanceof` to narrow, and
  * `code` + `params` to show a message in your own language. `message` is always English.
  */
 export class AuthorizationError extends Error {

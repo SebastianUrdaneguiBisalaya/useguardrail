@@ -1,4 +1,4 @@
-import { AdapterMappingError } from "@useguardril/core";
+import { AdapterMappingError } from "@useguardrail/core";
 
 const FORBIDDEN_SEGMENTS = new Set([
   "__proto__",

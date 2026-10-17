@@ -1,5 +1,5 @@
-import type { RelationTuple } from "@useguardril/core";
-import { AdapterMappingError } from "@useguardril/core";
+import type { RelationTuple } from "@useguardrail/core";
+import { AdapterMappingError } from "@useguardrail/core";
 import { compilePath, readList, readPath, toIdentifier } from "./path.js";
 import type { Adapter } from "./types.js";
 
@@ -72,8 +72,8 @@ const openFga = createTuplesAdapter({
 
 /**
  * Adapter for an OpenFGA `Read` response (`{ tuples: [{ key: { user, relation, object } }] }`).
- * Userset subjects such as `"team:eng#member"` map directly. Wildcard subjects (`"user:*"`)
- * are kept as written and match nobody, because the core graph has no wildcard support.
+ * Userset subjects such as `"team:eng#member"` and wildcard subjects such as `"user:*"` map
+ * directly; `@useguardrail/core` understands both.
  */
 export const openFgaTuplesAdapter: Adapter<RelationTuple[]> = openFga;
 

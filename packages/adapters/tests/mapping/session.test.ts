@@ -1,4 +1,4 @@
-import { AdapterMappingError } from "@useguardril/core";
+import { AdapterMappingError } from "@useguardrail/core";
 import { describe, expect, it } from "vitest";
 import { createSessionAdapter } from "../../src/index.js";
 
@@ -49,6 +49,35 @@ describe("createSessionAdapter", () => {
           "editor",
           "viewer",
         ],
+      },
+    });
+  });
+
+  it("maps context attributes when present", () => {
+    const adapt = createSessionAdapter({
+      contextAttributes: {
+        plan: "organization.plan",
+      },
+      subjectId: "id",
+      tenantId: "organization.id",
+    });
+    expect(
+      adapt({
+        id: "u",
+        organization: {
+          id: "o",
+          plan: "pro",
+        },
+      }),
+    ).toEqual({
+      context: {
+        attributes: {
+          plan: "pro",
+        },
+        tenantId: "o",
+      },
+      subject: {
+        id: "u",
       },
     });
   });

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to **useguardril**, a frontend-first, framework-independent authorization SDK (RBAC, ABAC, ReBAC) written in TypeScript. Please read this guide before opening a pull request.
+Thanks for your interest in contributing to **useguardrail**, a frontend-first, framework-independent authorization SDK (RBAC, ABAC, ReBAC) written in TypeScript. Please read this guide before opening a pull request.
 
 ## Code of conduct
 
@@ -17,11 +17,9 @@ This is a `pnpm` workspace:
 
 ```
 packages/
-  core/       # @useguardril/core: engine, RBAC/ABAC/ReBAC evaluators, context, store
-  react/      # @useguardril/react: provider, hooks, <Can>
-  adapters/   # @useguardril/adapters: backend responses -> core contract
-apps/
-  website/    # documentation website
+  core/       # @useguardrail/core: engine, RBAC/ABAC/ReBAC evaluators, context, store
+  react/      # @useguardrail/react: provider, hooks, <Can>
+  adapters/   # @useguardrail/adapters: backend responses -> core contract
 ```
 
 Dependencies point one way: `react` and `adapters` depend on `core`; `core` depends on neither. Each package has its own `src/`, `tests/`, `README.md`, and `CHANGELOG.md`.
@@ -30,8 +28,8 @@ Dependencies point one way: `react` and `adapters` depend on `core`; `core` depe
 
 1. **Fork** the repository and clone your fork:
    ```bash
-   git clone git@github.com:<your-username>/useguardril.git
-   cd useguardril
+   git clone git@github.com:<your-username>/useguardrail.git
+   cd useguardrail
    ```
 2. **Install dependencies**:
    ```bash
@@ -81,13 +79,16 @@ pnpm run build       # tsup in every package (core builds first)
 If you change evaluation or store code, also run the benchmarks and compare against the numbers in the root README:
 
 ```bash
-pnpm --filter @useguardril/core run bench
+pnpm --filter @useguardrail/core run bench
 ```
 
 ### Tests
 
 - Add or update tests under the package's `tests/`, mirroring the structure of its `src/`.
 - Cover, for each rule model you touch: allow, deny, default-deny, and malformed input.
+- Invariants ("never throws", "deny wins", "traversal terminates") are also checked with property-based tests ([fast-check](https://fast-check.dev/)) in `tests/properties/`, comparing the real code against a deliberately naive reference implementation. If you change evaluation logic, extend the reference and the generators too. A failing property prints a counterexample and a seed to replay it.
+- Public types are protected by type-level tests (`tests/types/*.test-d.ts`, using `expectTypeOf` and `@ts-expect-error`). They don't run: `pnpm run typecheck` fails if the declared API changes, so update them together with any intentional change to an exported type.
+- Docs: every name a package exports must appear in that package's `README.md` (`tests/docs/readme-exports.test.mjs` fails otherwise). When you add or change behavior, update the READMEs in the same PR, and keep their code examples complete and accurate: they are the only documentation, there is no docs site.
 - Never call a real backend or authorization service in tests; use sample payloads.
 - Cross-package behavior is tested in the consuming package: `core` + `react` in `packages/react/tests/integration/`, `adapters` + `core` in `packages/adapters/tests/integration/`.
 
@@ -111,7 +112,7 @@ Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `buil
 2. Fill in the PR description: what changed, why, and how it was tested. Link any related issue.
 3. Ensure the CI checks (typecheck, lint, test, build) pass; a PR with red checks will not be reviewed.
 4. If your change affects the public API (anything exported from a package's `src/index.ts`), call that out explicitly in the PR description and note whether it's a breaking change.
-5. Add a line to the affected package's `CHANGELOG.md` under the unreleased version.
+5. Add a line to the affected package's `CHANGELOG.md` under an `## Unreleased` heading at the top (create it above the latest version if it is missing).
 6. Be responsive to review feedback. A maintainer will merge once the PR is approved and CI is green.
 
 ## What you should *not* do
@@ -125,7 +126,7 @@ Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `buil
 Open a GitHub issue with:
 
 - A clear description of the bug or the requested feature.
-- Steps to reproduce (for bugs), including the package name and version, and the Node.js version (and React version, for `@useguardril/react`).
+- Steps to reproduce (for bugs), including the package name and version, and the Node.js version (and React version, for `@useguardrail/react`).
 - Expected vs. actual behavior, ideally with a minimal policy or role set that reproduces it.
 
 Please do not include real credentials or real user data in issues; use synthetic data.

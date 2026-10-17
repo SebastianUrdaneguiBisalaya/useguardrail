@@ -1,5 +1,12 @@
 import { InvalidPolicyError } from "../errors.js";
-import type { EvaluationInput, Evaluator } from "../types/index.js";
+import { ownProperty } from "../own.js";
+import type {
+  ActionName,
+  EvaluationInput,
+  Evaluator,
+  ResourceName,
+  Schema,
+} from "../types/index.js";
 import { parsePath, readPath } from "./path.js";
 
 /** Comparison operators available in an ABAC {@link Condition}. */
@@ -23,28 +30,63 @@ export type ConditionOperator =
  * another field through `valueFrom`. `exists` takes a boolean `value`.
  * If either side is missing, the condition does not hold.
  */
-export type Condition = {
+export type FieldCondition = {
   readonly field: string;
   readonly op: ConditionOperator;
   readonly value?: unknown;
   readonly valueFrom?: string;
 };
 
-/** An attribute-based policy. All `conditions` must hold (AND) for the policy to apply. */
-export type AbacPolicy = {
+/** Holds when **every** condition in the (non-empty) list holds. */
+export type AllCondition = {
+  readonly all: readonly Condition[];
+};
+
+/** Holds when **at least one** condition in the (non-empty) list holds. */
+export type AnyCondition = {
+  readonly any: readonly Condition[];
+};
+
+/**
+ * Holds when the condition inside does **not** hold. Careful: a condition that fails only
+ * because a value is missing becomes true under `not`. Prefer positive conditions in `allow`
+ * policies and express exclusions as `deny` policies.
+ */
+export type NotCondition = {
+  readonly not: Condition;
+};
+
+/**
+ * A test on the request: a {@link FieldCondition}, or `all` / `any` / `not` combining other
+ * conditions, nested up to {@link MAX_CONDITION_DEPTH} levels.
+ */
+export type Condition =
+  | FieldCondition
+  | AllCondition
+  | AnyCondition
+  | NotCondition;
+
+/** How many levels of `all` / `any` / `not` a condition may nest. Deeper conditions are rejected. */
+export const MAX_CONDITION_DEPTH = 8;
+
+/**
+ * An attribute-based policy. All top-level `conditions` must hold (AND) for the policy to
+ * apply; use `any` and `not` inside them for OR and NOT.
+ */
+export type AbacPolicy<S extends Schema = Schema> = {
   /** Unique identifier, used in decision reasons. */
   readonly id: string;
   readonly effect: "allow" | "deny";
   /** Actions this policy applies to. Omit (or use `"*"`) for any action. */
-  readonly actions?: readonly string[];
+  readonly actions?: readonly (ActionName<S> | "*")[];
   /** Resource types this policy applies to. Omit (or use `"*"`) for any type. */
-  readonly resources?: readonly string[];
+  readonly resources?: readonly (ResourceName<S> | "*")[];
   readonly conditions?: readonly Condition[];
 };
 
 /** Configuration for {@link createAbacEvaluator}. */
-export type AbacConfig = {
-  readonly policies: readonly AbacPolicy[];
+export type AbacConfig<S extends Schema = Schema> = {
+  readonly policies: readonly AbacPolicy<S>[];
 };
 
 const OPERATORS: ReadonlySet<string> = new Set([
@@ -136,18 +178,11 @@ const compilePath = (path: unknown, policyId: string): readonly string[] => {
 
 type Check = (input: EvaluationInput) => boolean;
 
-const compileCondition = (condition: Condition, policyId: string): Check => {
+const compileField = (node: object, policyId: string): Check => {
   const where = `Policy "${policyId}"`;
-  const candidate = condition as Partial<Condition> | null;
-  if (typeof candidate !== "object" || candidate === null) {
-    throw new InvalidPolicyError(`${where}: condition must be an object.`, {
-      code: "CONDITION_NOT_OBJECT",
-      params: {
-        policyId,
-      },
-    });
-  }
-  const { op, value, valueFrom } = candidate;
+  const op = ownProperty(node, "op");
+  const value = ownProperty(node, "value");
+  const valueFrom = ownProperty(node, "valueFrom");
   if (typeof op !== "string" || !OPERATORS.has(op)) {
     throw new InvalidPolicyError(`${where}: unknown operator "${clip(op)}".`, {
       code: "CONDITION_OPERATOR_UNKNOWN",
@@ -158,7 +193,7 @@ const compileCondition = (condition: Condition, policyId: string): Check => {
     });
   }
   const operator = op as ConditionOperator;
-  const field = compilePath(candidate.field, policyId);
+  const field = compilePath(ownProperty(node, "field"), policyId);
 
   if (operator === "exists") {
     if (typeof value !== "boolean" || valueFrom !== undefined) {
@@ -204,6 +239,79 @@ const compileCondition = (condition: Condition, policyId: string): Check => {
     );
   }
   return (input) => compare(operator, readPath(input, field), value);
+};
+
+/** Compiles a condition tree into a function. Reads own properties only. */
+const compileNode = (node: unknown, policyId: string, depth: number): Check => {
+  const where = `Policy "${policyId}"`;
+  if (typeof node !== "object" || node === null || Array.isArray(node)) {
+    throw new InvalidPolicyError(`${where}: condition must be an object.`, {
+      code: "CONDITION_NOT_OBJECT",
+      params: {
+        policyId,
+      },
+    });
+  }
+  if (depth > MAX_CONDITION_DEPTH) {
+    throw new InvalidPolicyError(
+      `${where}: conditions are nested deeper than ${MAX_CONDITION_DEPTH} levels.`,
+      {
+        code: "CONDITION_TOO_DEEP",
+        params: {
+          maxDepth: MAX_CONDITION_DEPTH,
+          policyId,
+        },
+      },
+    );
+  }
+
+  const groups = (
+    [
+      "all",
+      "any",
+      "not",
+    ] as const
+  ).filter((key) => Object.hasOwn(node, key));
+  const isField = Object.hasOwn(node, "field") || Object.hasOwn(node, "op");
+  if (groups.length + (isField ? 1 : 0) !== 1) {
+    throw new InvalidPolicyError(
+      `${where}: a condition must be exactly one of a field comparison, \`all\`, \`any\`, or \`not\`.`,
+      {
+        code: "CONDITION_SHAPE_INVALID",
+        params: {
+          policyId,
+        },
+      },
+    );
+  }
+
+  const group = groups[0];
+  if (group === undefined) {
+    return compileField(node, policyId);
+  }
+  if (group === "not") {
+    const inner = compileNode(ownProperty(node, "not"), policyId, depth + 1);
+    return (input) => !inner(input);
+  }
+  const children = ownProperty(node, group);
+  if (!Array.isArray(children) || children.length === 0) {
+    throw new InvalidPolicyError(
+      `${where}: \`${group}\` requires a non-empty array of conditions.`,
+      {
+        code: "CONDITION_GROUP_INVALID",
+        params: {
+          operator: group,
+          policyId,
+        },
+      },
+    );
+  }
+  const checks = children.map((child) =>
+    compileNode(child, policyId, depth + 1),
+  );
+  return group === "all"
+    ? (input) => checks.every((check) => check(input))
+    : (input) => checks.some((check) => check(input));
 };
 
 const compileScope = (
@@ -256,7 +364,9 @@ const compileScope = (
  *   ],
  * });
  */
-export function createAbacEvaluator(config: AbacConfig): Evaluator {
+export function createAbacEvaluator<S extends Schema = Schema>(
+  config: AbacConfig<S>,
+): Evaluator<S> {
   const rawPolicies: unknown = config?.policies;
   if (!Array.isArray(rawPolicies)) {
     throw new InvalidPolicyError(
@@ -331,7 +441,7 @@ export function createAbacEvaluator(config: AbacConfig): Evaluator {
       const matchesAction = compileScope(policy.actions, "actions", id);
       const matchesResource = compileScope(policy.resources, "resources", id);
       const checks = (policy.conditions ?? []).map((condition) =>
-        compileCondition(condition, id),
+        compileNode(condition, id, 0),
       );
       return {
         checks,
@@ -363,7 +473,7 @@ export function createAbacEvaluator(config: AbacConfig): Evaluator {
     return candidates;
   };
 
-  return (input) => {
+  const evaluator: Evaluator = (input) => {
     let allowedBy: string | undefined;
     for (const policy of candidatesFor(input.action, input.resource.type)) {
       if (!policy.checks.every((check) => check(input))) {
@@ -392,4 +502,6 @@ export function createAbacEvaluator(config: AbacConfig): Evaluator {
           reason: `Policy "${allowedBy}" allows access.`,
         };
   };
+
+  return evaluator as unknown as Evaluator<S>;
 }

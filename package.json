@@ -1,7 +1,7 @@
 {
-  "name": "useguardril",
+  "name": "useguardrail",
   "version": "0.0.0",
-  "description": "Monorepo workspace root: useguardril, a frontend-first authorization SDK (packages/*) + docs website (apps/website).",
+  "description": "Monorepo workspace root: useguardrail, a frontend-first authorization SDK (packages/*).",
   "license": "ISC",
   "author": {
     "name": "Sebastian Marat Urdanegui Bisalaya",
@@ -17,6 +17,7 @@
     "format": "biome format --write .",
     "test": "pnpm --filter \"./packages/*\" run test",
     "test:watch": "pnpm --filter ./packages/core run test:watch",
+    "coverage": "pnpm --filter \"./packages/*\" run coverage",
     "prepare": "husky"
   },
   "devEngines": {

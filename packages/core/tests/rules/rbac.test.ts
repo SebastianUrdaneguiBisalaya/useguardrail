@@ -189,6 +189,39 @@ describe("createRbacEvaluator", () => {
     ).toBe("deny");
   });
 
+  it("rejects an `inherits` that is not an array of strings", () => {
+    expect(() =>
+      createRbacEvaluator({
+        roles: {
+          a: {
+            inherits: "b",
+            permissions: [],
+          },
+        },
+      } as never),
+    ).toThrow(
+      expect.objectContaining({
+        code: "ROLE_INHERITS_INVALID",
+      }),
+    );
+    expect(() =>
+      createRbacEvaluator({
+        roles: {
+          a: {
+            inherits: [
+              1,
+            ],
+            permissions: [],
+          },
+        },
+      } as never),
+    ).toThrow(
+      expect.objectContaining({
+        code: "ROLE_INHERITS_INVALID",
+      }),
+    );
+  });
+
   it("rejects malformed configuration", () => {
     const bad = (roles: unknown) => () =>
       createRbacEvaluator({

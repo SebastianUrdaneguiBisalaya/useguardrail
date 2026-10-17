@@ -2,7 +2,7 @@
 
 Standards and best practices for building, maintaining, and publishing a Node.js library written in TypeScript, bundled with `tsup`, and distributed on npm.
 
-**This is a template repository.** Sections 1-10 below are generic and apply to any Node.js + TypeScript + tsup library. The final section, "Project context: `useguardril`," specializes them for this project — a frontend-first, framework-agnostic authorization SDK (RBAC, ReBAC, ABAC) — and takes precedence over the generic sections where they conflict (e.g. the server-side-only rules in section 6 do not apply).
+This repository started from a Node.js + TypeScript + tsup library template. Sections 1-9 below are the generic standards it follows. The final section, "Project context: `useguardrail`," specializes them for this project — a frontend-first, framework-agnostic authorization SDK (RBAC, ReBAC, ABAC) — and takes precedence over the generic sections where they conflict (e.g. the server-side-only rules in section 6 do not apply).
 
 ## 1. Project structure
 
@@ -73,9 +73,10 @@ This is achieved by:
 
 ### CI publish flow (`.github/workflows/publish.yml`)
 
-- **Trigger**: a GitHub Release being published (`release: types: [published]`). Merging to `main` does **not** publish anything by itself — publishing is a separate, deliberate step: bump `version` in `package.json` (following semver, see section 4), merge that to `main`, then create a GitHub Release (tag matching the new version is recommended, e.g. `v1.2.0`) to trigger the actual npm publish.
+- **Trigger**: every push to `main` (`push: branches: [main]`). Publishing is still deliberate: a push only publishes a package whose `version` is not yet on the registry, so to release, bump `version` in that package's `package.json` (following semver, see section 4) in the PR you merge to `main`. Pushing to `main` without a version bump publishes nothing.
 - **Gate**: `typecheck` → `lint` → `test` → `build` must all pass before publishing is attempted.
-- **Version guard**: before publishing, the workflow checks `npm view <name>@<version>` against the current `package.json` version and skips the publish step if that version is already on the registry — a safety net in case a release is edited/republished without a version bump.
+- **Packages and order**: the workflow publishes `core`, then `react`, then `adapters` (the last two depend on `core`). A package is skipped if it is `"private": true` or if `npm view <name>@<version>` shows its current version is already on the registry, so each package is released independently by bumping only its own version.
+- **Concurrency**: runs for the same ref are serialized (`concurrency`), and a running publish is never cancelled.
 - **Required GitHub secret**: `NPM_TOKEN`.
   - Generate it on [npmjs.com](https://www.npmjs.com) → avatar → *Access Tokens* → *Generate New Token* → **Automation** type (this type is meant for CI and bypasses the 2FA-for-publish prompt; it must have publish permission on this package/scope).
   - Configure it in GitHub at: repository → **Settings** → **Secrets and variables** → **Actions** → **New repository secret** → name it exactly `NPM_TOKEN`, paste the token value.
@@ -126,9 +127,9 @@ After any source change, run from the repo root and fix each failure before movi
 
 ## 8. Target environment: server, client, or both
 
-Before writing SDK code for a specific project (not while working on the generic template), check whether the project context states if the SDK is meant to run server-only, client-only, or both, and apply the corresponding rules:
+Before writing SDK code for a specific project check whether the project context states if the SDK is meant to run server-only, client-only, or both, and apply the corresponding rules:
 
-- **server-only** (a Node.js backend, API route, serverless function) — the default assumption in this template: apply the secret-key handling in section 6 as written.
+- **server-only** (a Node.js backend, API route, serverless function) — the default assumption in these standards: apply the secret-key handling in section 6 as written.
 - **client-only** (browser/mobile) — none of section 6's secret-key/server-side-only rules apply the same way, since there's no server-side code to guard; use a public/non-privileged key model instead.
 - **both** — the codebase needs a clear boundary (e.g. separate entry points/exports) between the server-side client that holds secrets and any client-side helper that doesn't.
 
@@ -136,7 +137,7 @@ This choice determines which practices from section 6 and from the "Client desig
 
 ## 9. Provider plugins (optional monorepo layout)
 
-**This template already ships with this layout applied** (`packages/core`, wired up via `pnpm-workspace.yaml`), even before any provider package exists — treat it as the baseline going forward, not something to opt into later. Everything below explains why it's shaped this way and how to add a provider package to it.
+**This repo uses this layout** (`packages/core`, `packages/react`, `packages/adapters`, wired up via `pnpm-workspace.yaml`) — treat it as the baseline, not something to opt into later. Everything below explains why it's shaped this way and how to add a provider package to it.
 
 If the SDK supports pluggable external providers (e.g. storage backends: S3, Cloudflare R2, GCS) and consumers should only install the dependencies a given provider actually needs, split the SDK into a `pnpm` workspace instead of a single package:
 
@@ -155,33 +156,25 @@ pnpm-workspace.yaml
 - The publish gate from section 3 (`typecheck` → `lint` → `test` → `build`) still applies, run across the whole workspace (`pnpm -r run typecheck`, etc.) before any package is published.
 - If the SDK has no pluggable providers, skip this section entirely and keep the single-package layout from section 0/1.
 
-## 10. Documentation website
-
-- This template does not ship a documentation website by default. If one is added later (Docusaurus, Nextra, VitePress, etc.), give it its own top-level directory — `apps/website/` if the repo already has the `apps/*` + `packages/*` split (add `apps/*` back to `pnpm-workspace.yaml`), or a plain `website/` at the repo root (sibling to `packages/`) otherwise.
-- The website must never be published to npm: keep it out of every package's `files` field / add it to `.npmignore` so it can't leak into a published tarball.
-- Deploy the website independently of the SDK's npm release (its own CI job/workflow) — docs can and should ship more often than the package itself (e.g. after a README/example fix that doesn't warrant a version bump).
-
 ---
 
-# Project context: `useguardril` — frontend-first authorization SDK
+# Project context: `useguardrail` — frontend-first authorization SDK
 
-`useguardril` is a framework-agnostic, frontend-first authorization SDK. It evaluates permissions on the client (UI gating, route guards, feature flags) and is designed to support **RBAC**, **ReBAC**, and **ABAC** models behind a single evaluation API. It is a `pnpm` monorepo (see section 9).
+`useguardrail` is a framework-agnostic, frontend-first authorization SDK. It evaluates permissions on the client (UI gating, route guards, feature flags) and is designed to support **RBAC**, **ReBAC**, and **ABAC** models behind a single evaluation API. It is a `pnpm` monorepo (see section 9).
 
 ## 0. Target environment (section 8)
 
 - **Client-first, runs in browser and Node.** The SDK holds no secret keys: it evaluates permissions from data the consumer's backend already authorized for that user. The server-side-only rules and the `typeof window` guard from section 6 do **not** apply to this project; do not add them.
 - Authorization on the client is a UX layer, not a security boundary. Document in the README that the backend must always re-enforce every decision.
-- Never log permission data, relation tuples, or user attributes outside an explicit consumer-controlled debug flag.
+- Never log permission data, relation tuples, or user attributes. The only sanctioned way out is the consumer-controlled `onDecision` hook (and `explain`), which the consumer wires up; the library never writes to the console itself.
 
 ## 1. Workspace layout
 
-Adapted to the existing repo (`packages/*` + `apps/*` in `pnpm-workspace.yaml`):
+Adapted to the existing repo (`packages/*` in `pnpm-workspace.yaml`):
 
 ```
-apps/
-  website/                # docs website (section 10), already present
 packages/
-  core/                   # @useguardril/core — framework-independent engine
+  core/                   # @useguardrail/core — framework-independent engine
     src/
       index.ts            # barrel file — only public surface
       engine/             # evaluate(), decision pipeline
@@ -192,29 +185,29 @@ packages/
       types/              # shared public types
       errors.ts           # typed error classes
     tests/                # mirrors src/ (+ tests/performance/ benchmarks)
-  react/                  # @useguardril/react — React adapter
+  react/                  # @useguardrail/react — React adapter
     src/
       index.ts
       provider/           # AuthorizationProvider
       hooks/              # useCan(), ...
       components/         # <Can>
     tests/                # mirrors src/ (+ tests/integration/ for core + react)
-  adapters/               # @useguardril/adapters — backend response -> SDK contract
+  adapters/               # @useguardrail/adapters — backend response -> SDK contract
     src/
       index.ts
       mapping/            # path helpers, session/roles/tuples adapters
     tests/                # mirrors src/ (+ tests/integration/ for adapters + core)
 ```
 
-- Per-package `tests/` mirror `src/` (section 1). There is no root `tests/`: each package owns its vitest config, so cross-package integration tests live in the consuming package (`packages/react/tests/integration/`, which resolves `@useguardril/core` to its source) and benchmarks live next to the code they measure (`packages/core/tests/performance/`, run with `pnpm --filter @useguardril/core run bench`).
-- `apps/*` are never published. `biome.json` lives at the repo root; each package owns its own `tsconfig.base.json` (extended by its `tsconfig.json`) and `vitest.config.ts`.
+- Per-package `tests/` mirror `src/` (section 1). There is no root `tests/`: each package owns its vitest config, so cross-package integration tests live in the consuming package (`packages/react/tests/integration/`, which resolves `@useguardrail/core` to its source) and benchmarks live next to the code they measure (`packages/core/tests/performance/`, run with `pnpm --filter @useguardrail/core run bench`).
+- `biome.json` lives at the repo root; each package owns its own `tsconfig.base.json` (extended by its `tsconfig.json`) and `vitest.config.ts`.
 - Start with these three packages. Each ships its own unit tests; `core` + `react` also get integration tests. There is no separate testing package: test factories and fixtures live in each package's `tests/`.
 
 ## 2. Package responsibilities
 
 - **`core`**: permission evaluation, relations, rules, multi-tenant context, and a reactive store. **No UI or framework dependency, zero runtime dependencies.** Only package that defines the engine, shared types, and error classes.
-- **`react`**: `AuthorizationProvider`, hooks such as `useCan()`, and components such as `<Can>`. Peer-depends on `@useguardril/core` and `react`. Subscribes through `useSyncExternalStore` with selective subscriptions to minimize re-renders.
-- **`adapters`**: transforms responses from different backends into the SDK's common contract. Peer-depends on `@useguardril/core` (types only where possible).
+- **`react`**: `AuthorizationProvider`, hooks such as `useCan()`, and components such as `<Can>`. Peer-depends on `@useguardrail/core` and `react`. Subscribes through `useSyncExternalStore` with selective subscriptions to minimize re-renders.
+- **`adapters`**: transforms responses from different backends into the SDK's common contract. Peer-depends on `@useguardrail/core` (types only where possible).
 
 Dependency direction is one-way: `react`, `adapters` → `core`. `core` never imports from either, and they never import from each other.
 
@@ -222,6 +215,7 @@ Dependency direction is one-way: `react`, `adapters` → `core`. `core` never im
 
 - The engine is a pure, synchronous-by-default evaluator: `(subject, action, resource, context) → Decision`. Model RBAC, ReBAC, and ABAC as pluggable evaluators that compose into one decision; don't special-case one model in the engine.
 - The reactive store is hand-rolled (`subscribe` / `getSnapshot`) and compatible with `useSyncExternalStore`. **Do not add Zustand or any state library** as a dependency.
+- Schema typing (`Schema`, `forSchema<S>()`) is compile-time only: it must never change runtime behavior, every generic defaults to the loose schema (so schema-less code keeps compiling), and runtime validation stays in place for plain-JS callers. Cover each typed surface with `tests/types/*.test-d.ts` (what must compile and what must not).
 - No classes (section 2): `createEngine(config)`, `createStore(initial)`, etc. return plain objects/closures.
 - Decisions must be deterministic and side-effect free; the same inputs always produce the same result. Default to **deny** when no rule matches or evaluation fails.
 - Multi-tenancy is explicit: tenant identity travels in `context`, never in module-level state.
@@ -241,6 +235,8 @@ Dependency direction is one-way: `react`, `adapters` → `core`. `core` never im
 
 - Vitest; mock any HTTP/backend boundary, never hit a real service.
 - Cover per rule model (RBAC, ReBAC, ABAC): allow, deny, default-deny, and malformed input.
+- Property-based tests (`fast-check`, in `tests/properties/`) check the invariants the README promises — evaluation never throws, deny wins, ReBAC traversal terminates, stale loads never win — against naive reference implementations. Keep the reference simple; never copy the production algorithm into it.
+- Type-level tests (`tests/types/*.test-d.ts`) pin the public `.d.ts` contract; they are checked by `tsc` through `pnpm run typecheck`.
 - Integration tests assert that `core` store updates re-render only the components subscribed to the affected permission.
 - `packages/core/tests/performance/` holds benchmarks (`vitest bench`) for evaluation over large policy/relation sets; investigate regressions there like failing tests.
 

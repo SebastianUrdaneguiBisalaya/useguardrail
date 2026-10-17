@@ -17,7 +17,7 @@ export default defineConfig({
 
   external: [
     "react",
-    "@useguardril/core",
+    "@useguardrail/core",
   ],
 
   format: [

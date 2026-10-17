@@ -4,7 +4,7 @@ import {
   createRbacEvaluator,
   createRebacEvaluator,
   createRelationGraph,
-} from "@useguardril/core";
+} from "@useguardrail/core";
 import { describe, expect, it } from "vitest";
 import {
   createRolesAdapter,
@@ -156,5 +156,37 @@ describe("adapters + core integration", () => {
       },
     });
     expect(decision.effect).toBe("allow");
+  });
+});
+
+describe("OpenFGA wildcards through the core graph", () => {
+  it("honours user:* from an OpenFGA read response", () => {
+    const graph = createRelationGraph({
+      tuples: openFgaTuplesAdapter({
+        tuples: [
+          {
+            key: {
+              object: "document:handbook",
+              relation: "viewer",
+              user: "user:*",
+            },
+          },
+          {
+            key: {
+              object: "document:secret",
+              relation: "viewer",
+              user: "user:ana",
+            },
+          },
+        ],
+      }),
+    });
+    expect(graph.check("user:anyone", "viewer", "document:handbook")).toBe(
+      true,
+    );
+    expect(graph.check("service:bot", "viewer", "document:handbook")).toBe(
+      false,
+    );
+    expect(graph.check("user:anyone", "viewer", "document:secret")).toBe(false);
   });
 });

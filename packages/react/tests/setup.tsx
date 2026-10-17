@@ -1,9 +1,9 @@
-import type { Context, Subject } from "@useguardril/core";
+import type { Context, Subject } from "@useguardrail/core";
 import {
   createAuthorizationStore,
   createEngine,
   createRbacEvaluator,
-} from "@useguardril/core";
+} from "@useguardrail/core";
 
 const rbac = createRbacEvaluator({
   roles: {
