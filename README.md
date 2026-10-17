@@ -126,6 +126,8 @@ What it cannot defend against, by design: **anyone who controls the browser.** A
 
 Pass plain data objects (not class instances with prototype getters) as subjects, resources, and contexts.
 
+**Server rendering:** create the authorization store per request, never at module level on the server, or one user's subject can leak into another user's render. See [SSR and hydration](./packages/react/README.md#server-side-rendering-and-hydration).
+
 ## Limits and edge behavior
 
 Rule of thumb: **mistakes in configuration throw when you create the engine, evaluator, graph, store, or adapter. Nothing throws while evaluating**; a limit reached at evaluation time results in `deny` or "no opinion", never an exception.
