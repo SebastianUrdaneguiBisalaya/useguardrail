@@ -45,3 +45,35 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+  # The package declares react >= 18, so keep proving it: swap in React 18 and re-run the adapter's checks.
+  react-18:
+    name: React 18 compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.3.4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Use React 18
+        run: pnpm --filter @useguardril/react add -D -E react@18.3.1 react-dom@18.3.1 @types/react@18 @types/react-dom@18
+
+      - name: Typecheck
+        run: pnpm --filter @useguardril/react run typecheck
+
+      - name: Test
+        run: pnpm --filter @useguardril/react run test
