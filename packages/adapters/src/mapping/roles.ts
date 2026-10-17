@@ -17,19 +17,35 @@ export type RolesMapping = {
 
 const readStringList = (
   value: unknown,
-  label: string,
+  field: "permissions" | "inherits",
+  record: number,
 ): readonly string[] | undefined => {
+  const label = `roles: record ${record} ${field}`;
   if (value === undefined || value === null) {
     return undefined;
   }
   if (!Array.isArray(value)) {
-    throw new AdapterMappingError(`${label}: expected an array.`);
+    throw new AdapterMappingError(`${label}: expected an array.`, {
+      code: "ADAPTER_STRING_LIST_INVALID",
+      params: {
+        field,
+        index: record,
+      },
+    });
   }
   return value.map((item, index) => {
     const text = toIdentifier(item);
     if (text === undefined) {
       throw new AdapterMappingError(
         `${label}: entry ${index} is not a usable string.`,
+        {
+          code: "ADAPTER_STRING_LIST_INVALID",
+          params: {
+            entry: index,
+            field,
+            index: record,
+          },
+        },
       );
     }
     return text;
@@ -71,35 +87,58 @@ export function createRolesAdapter(
       if (roleName === undefined) {
         throw new AdapterMappingError(
           `roles: record ${index} has no usable name.`,
+          {
+            code: "ADAPTER_ROLE_NAME_MISSING",
+            params: {
+              index,
+            },
+          },
         );
       }
       if (roleName === "__proto__") {
         // Assigning this key would replace the object's prototype instead of adding a role.
         throw new AdapterMappingError(
           `roles: record ${index} has an unsafe name.`,
+          {
+            code: "ADAPTER_ROLE_NAME_UNSAFE",
+            params: {
+              index,
+            },
+          },
         );
       }
       if (Object.hasOwn(roles, roleName)) {
         throw new AdapterMappingError(
           `roles: duplicate role at record ${index}.`,
+          {
+            code: "ADAPTER_ROLE_DUPLICATE",
+            params: {
+              index,
+            },
+          },
         );
       }
       const granted = readStringList(
         readPath(record, permissions),
-        `roles: record ${index} permissions`,
+        "permissions",
+        index,
       );
       if (granted === undefined) {
         throw new AdapterMappingError(
           `roles: record ${index} has no permissions at "${permissions.join(".")}".`,
+          {
+            code: "ADAPTER_PERMISSIONS_MISSING",
+            params: {
+              index,
+              path: permissions.join("."),
+            },
+          },
         );
       }
       const parents =
         inherits === undefined
           ? undefined
-          : readStringList(
-              readPath(record, inherits),
-              `roles: record ${index} inherits`,
-            );
+          : readStringList(readPath(record, inherits), "inherits", index);
       roles[roleName] = {
         permissions: granted,
         ...(parents === undefined

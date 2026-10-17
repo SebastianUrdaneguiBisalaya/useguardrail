@@ -24,6 +24,13 @@ const requireReference = (
   if (reference === undefined) {
     throw new AdapterMappingError(
       `${label}: record ${index} has no usable ${label}.`,
+      {
+        code: "ADAPTER_FIELD_MISSING",
+        params: {
+          field: label,
+          index,
+        },
+      },
     );
   }
   return reference;
@@ -86,6 +93,13 @@ const spiceDbReference = (
   if (type === undefined || id === undefined) {
     throw new AdapterMappingError(
       `${label}: record ${index} has no usable ${label}.`,
+      {
+        code: "ADAPTER_FIELD_MISSING",
+        params: {
+          field: label,
+          index,
+        },
+      },
     );
   }
   return `${type}:${id}`;

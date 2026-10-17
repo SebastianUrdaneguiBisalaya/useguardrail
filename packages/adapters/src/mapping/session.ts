@@ -39,6 +39,12 @@ const compileAttributes = (
   if (typeof mapping !== "object" || mapping === null) {
     throw new AdapterMappingError(
       `${label}: expected an object of name -> path.`,
+      {
+        code: "ADAPTER_ATTRIBUTES_INVALID",
+        params: {
+          option: label,
+        },
+      },
     );
   }
   return Object.entries(mapping).map(([name, path]) => [
@@ -107,6 +113,12 @@ export function createSessionAdapter(
     if (id === undefined) {
       throw new AdapterMappingError(
         `subjectId: expected a non-empty string or number at "${subjectId.join(".")}".`,
+        {
+          code: "ADAPTER_SUBJECT_ID_MISSING",
+          params: {
+            path: subjectId.join("."),
+          },
+        },
       );
     }
 
@@ -117,6 +129,12 @@ export function createSessionAdapter(
         if (!Array.isArray(raw)) {
           throw new AdapterMappingError(
             `roles: expected an array at "${roles.join(".")}".`,
+            {
+              code: "ADAPTER_ROLES_NOT_ARRAY",
+              params: {
+                path: roles.join("."),
+              },
+            },
           );
         }
         roleNames = raw.map((entry, index) => {
@@ -126,6 +144,12 @@ export function createSessionAdapter(
           if (name === undefined) {
             throw new AdapterMappingError(
               `roles: entry ${index} has no usable role name.`,
+              {
+                code: "ADAPTER_ROLE_NAME_MISSING",
+                params: {
+                  index,
+                },
+              },
             );
           }
           return name;
@@ -139,6 +163,12 @@ export function createSessionAdapter(
       if (tenant === undefined) {
         throw new AdapterMappingError(
           `tenantId: expected a non-empty string or number at "${tenantId.join(".")}".`,
+          {
+            code: "ADAPTER_TENANT_ID_MISSING",
+            params: {
+              path: tenantId.join("."),
+            },
+          },
         );
       }
     }

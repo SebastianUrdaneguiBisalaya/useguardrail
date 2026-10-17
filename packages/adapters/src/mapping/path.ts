@@ -15,7 +15,12 @@ export type Path = readonly string[];
  */
 export const compilePath = (path: unknown, label: string): Path => {
   if (typeof path !== "string" || path === "") {
-    throw new AdapterMappingError(`${label}: expected a non-empty dot path.`);
+    throw new AdapterMappingError(`${label}: expected a non-empty dot path.`, {
+      code: "ADAPTER_PATH_INVALID",
+      params: {
+        option: label,
+      },
+    });
   }
   const segments = path.split(".");
   if (
@@ -23,7 +28,12 @@ export const compilePath = (path: unknown, label: string): Path => {
       (segment) => segment === "" || FORBIDDEN_SEGMENTS.has(segment),
     )
   ) {
-    throw new AdapterMappingError(`${label}: invalid path "${path}".`);
+    throw new AdapterMappingError(`${label}: invalid path "${path}".`, {
+      code: "ADAPTER_PATH_INVALID",
+      params: {
+        option: label,
+      },
+    });
   }
   return segments;
 };
@@ -70,6 +80,18 @@ export const readList = (
       path === undefined
         ? `${label}: expected the response to be an array.`
         : `${label}: expected an array at "${path.join(".")}".`,
+      {
+        code: "ADAPTER_LIST_NOT_ARRAY",
+        params:
+          path === undefined
+            ? {
+                option: label,
+              }
+            : {
+                option: label,
+                path: path.join("."),
+              },
+      },
     );
   }
   return value;
