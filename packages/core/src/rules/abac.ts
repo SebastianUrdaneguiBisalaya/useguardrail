@@ -1,5 +1,11 @@
 import { InvalidPolicyError } from "../errors.js";
-import type { EvaluationInput, Evaluator } from "../types/index.js";
+import type {
+  ActionName,
+  EvaluationInput,
+  Evaluator,
+  ResourceName,
+  Schema,
+} from "../types/index.js";
 import { parsePath, readPath } from "./path.js";
 
 /** Comparison operators available in an ABAC {@link Condition}. */
@@ -31,20 +37,20 @@ export type Condition = {
 };
 
 /** An attribute-based policy. All `conditions` must hold (AND) for the policy to apply. */
-export type AbacPolicy = {
+export type AbacPolicy<S extends Schema = Schema> = {
   /** Unique identifier, used in decision reasons. */
   readonly id: string;
   readonly effect: "allow" | "deny";
   /** Actions this policy applies to. Omit (or use `"*"`) for any action. */
-  readonly actions?: readonly string[];
+  readonly actions?: readonly (ActionName<S> | "*")[];
   /** Resource types this policy applies to. Omit (or use `"*"`) for any type. */
-  readonly resources?: readonly string[];
+  readonly resources?: readonly (ResourceName<S> | "*")[];
   readonly conditions?: readonly Condition[];
 };
 
 /** Configuration for {@link createAbacEvaluator}. */
-export type AbacConfig = {
-  readonly policies: readonly AbacPolicy[];
+export type AbacConfig<S extends Schema = Schema> = {
+  readonly policies: readonly AbacPolicy<S>[];
 };
 
 const OPERATORS: ReadonlySet<string> = new Set([
@@ -256,7 +262,9 @@ const compileScope = (
  *   ],
  * });
  */
-export function createAbacEvaluator(config: AbacConfig): Evaluator {
+export function createAbacEvaluator<S extends Schema = Schema>(
+  config: AbacConfig<S>,
+): Evaluator<S> {
   const rawPolicies: unknown = config?.policies;
   if (!Array.isArray(rawPolicies)) {
     throw new InvalidPolicyError(
@@ -363,7 +371,7 @@ export function createAbacEvaluator(config: AbacConfig): Evaluator {
     return candidates;
   };
 
-  return (input) => {
+  const evaluator: Evaluator = (input) => {
     let allowedBy: string | undefined;
     for (const policy of candidatesFor(input.action, input.resource.type)) {
       if (!policy.checks.every((check) => check(input))) {
@@ -392,4 +400,6 @@ export function createAbacEvaluator(config: AbacConfig): Evaluator {
           reason: `Policy "${allowedBy}" allows access.`,
         };
   };
+
+  return evaluator as unknown as Evaluator<S>;
 }

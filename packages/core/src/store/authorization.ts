@@ -3,10 +3,12 @@ import type { Engine } from "../engine/index.js";
 import { InvalidContextError, InvalidPolicyError } from "../errors.js";
 import { ownProperty } from "../own.js";
 import type {
-  Action,
   Context,
   Decision,
-  Resource,
+  EvaluationInput,
+  ResourceFor,
+  ResourceName,
+  Schema,
   Subject,
 } from "../types/index.js";
 import type { Store } from "./index.js";
@@ -21,9 +23,9 @@ import { createStore } from "./index.js";
 export type AuthorizationStatus = "loading" | "ready" | "error";
 
 /** What an {@link AuthorizationStore} holds. Replaced (never mutated) on every change. */
-export type AuthorizationState = {
+export type AuthorizationState<S extends Schema = Schema> = {
   readonly context: Context;
-  readonly engine: Engine;
+  readonly engine: Engine<S>;
   /** The current actor, or `undefined` when nobody is authenticated (everything is denied). */
   readonly subject: Subject | undefined;
   readonly status: AuthorizationStatus;
@@ -32,8 +34,9 @@ export type AuthorizationState = {
 };
 
 /** Configuration for {@link createAuthorizationStore}. */
-export type AuthorizationStoreConfig = {
-  readonly engine: Engine;
+export type AuthorizationStoreConfig<S extends Schema = Schema> = {
+  /** An engine for the schema, or one without a schema (it accepts any request). */
+  readonly engine: Engine<S> | Engine;
   readonly subject?: Subject;
   readonly context?: Context;
   /**
@@ -48,38 +51,44 @@ export type AuthorizationStoreConfig = {
  * What a loader returns. Only the fields that are present are applied, all at once:
  * omit a field to keep its current value, or pass `subject: undefined` to sign out.
  */
-export type AuthorizationLoadResult = {
+export type AuthorizationLoadResult<S extends Schema = Schema> = {
   readonly subject?: Subject | undefined;
   readonly context?: Context;
-  readonly engine?: Engine;
+  readonly engine?: Engine<S> | Engine;
 };
 
 /**
  * Fetches authorization data. `signal` is aborted when a newer `load` starts, so you can
  * pass it to `fetch` to cancel the outdated request.
  */
-export type AuthorizationLoader = (options: {
+export type AuthorizationLoader<S extends Schema = Schema> = (options: {
   readonly signal: AbortSignal;
-}) => Promise<AuthorizationLoadResult> | AuthorizationLoadResult;
+}) => Promise<AuthorizationLoadResult<S>> | AuthorizationLoadResult<S>;
 
 /** A reactive store that couples an engine with the current subject and context. */
-export type AuthorizationStore = Pick<
-  Store<AuthorizationState>,
+export type AuthorizationStore<S extends Schema = Schema> = Pick<
+  Store<AuthorizationState<S>>,
   "getInitialSnapshot" | "getSnapshot" | "subscribe" | "subscribeSelector"
 > & {
   /**
    * Evaluates an action against the current subject, context, and engine. Never throws.
    * While `status` is `"loading"` or `"error"`, the result is always `deny`.
    */
-  readonly evaluate: (action: Action, resource: Resource) => Decision;
+  readonly evaluate: <T extends ResourceName<S>>(
+    action: S[T],
+    resource: ResourceFor<T>,
+  ) => Decision;
   /** Shorthand for `evaluate(...).effect === "allow"`. */
-  readonly can: (action: Action, resource: Resource) => boolean;
+  readonly can: <T extends ResourceName<S>>(
+    action: S[T],
+    resource: ResourceFor<T>,
+  ) => boolean;
   /** Sets (or clears, with `undefined`) the current subject. Does not change `status`. */
   readonly setSubject: (subject: Subject | undefined) => void;
   /** Replaces the context, e.g. when switching tenant. Does not change `status`. */
   readonly setContext: (context: Context) => void;
   /** Replaces the engine, e.g. after policies or relations changed. Does not change `status`. */
-  readonly setEngine: (engine: Engine) => void;
+  readonly setEngine: (engine: Engine<S> | Engine) => void;
   /**
    * Sets the status by hand, clearing any error. Prefer {@link AuthorizationStore.load},
    * which manages the status for you.
@@ -95,7 +104,7 @@ export type AuthorizationStore = Pick<
    * Never rejects. If a newer `load` starts first, the older one is aborted and its
    * result is ignored, so a slow stale response can never overwrite fresh data.
    */
-  readonly load: (loader: AuthorizationLoader) => Promise<void>;
+  readonly load: (loader: AuthorizationLoader<S>) => Promise<void>;
 };
 
 const deny = (code: string, reason: string): Decision =>
@@ -115,11 +124,13 @@ const LOAD_FAILED = deny(
   "Authorization data failed to load; access denied.",
 );
 
-const assertEngine = (engine: unknown): Engine => {
+const assertEngine = <S extends Schema = Schema>(
+  engine: unknown,
+): Engine<S> => {
   if (
     typeof engine !== "object" ||
     engine === null ||
-    typeof (engine as Engine).evaluate !== "function"
+    typeof (engine as Engine<S>).evaluate !== "function"
   ) {
     throw new InvalidPolicyError(
       "An engine created with createEngine is required.",
@@ -128,7 +139,7 @@ const assertEngine = (engine: unknown): Engine => {
       },
     );
   }
-  return engine as Engine;
+  return engine as Engine<S>;
 };
 
 const assertSubject = (subject: unknown): Subject | undefined => {
@@ -160,10 +171,13 @@ const assertSubject = (subject: unknown): Subject | undefined => {
  * @example
  * evaluateState(store.getInitialSnapshot(), "read", { type: "doc", id: "1" });
  */
-export function evaluateState(
-  state: AuthorizationState,
-  action: Action,
-  resource: Resource,
+export function evaluateState<
+  S extends Schema = Schema,
+  T extends ResourceName<S> = ResourceName<S>,
+>(
+  state: AuthorizationState<S>,
+  action: S[T],
+  resource: ResourceFor<T>,
 ): Decision {
   const { context, engine, status, subject } = state;
   if (status === "loading") {
@@ -178,7 +192,7 @@ export function evaluateState(
         context,
         resource,
         subject,
-      })
+      } as EvaluationInput<S>)
     : NO_SUBJECT;
 }
 
@@ -203,23 +217,25 @@ export function evaluateState(
  *   return { subject: { id: me.id, roles: me.roles }, context: { tenantId: me.tenant } };
  * });
  */
-export function createAuthorizationStore(
-  config: AuthorizationStoreConfig,
-): AuthorizationStore {
-  const store = createStore<AuthorizationState>({
+export function createAuthorizationStore<S extends Schema = Schema>(
+  config: AuthorizationStoreConfig<S>,
+): AuthorizationStore<S> {
+  const store = createStore<AuthorizationState<S>>({
     context: createContext(config?.context),
-    engine: assertEngine(config?.engine),
+    engine: assertEngine<S>(config?.engine),
     error: undefined,
     status: config.status === "loading" ? "loading" : "ready",
     subject: assertSubject(config.subject),
   });
 
-  const evaluate = (action: Action, resource: Resource): Decision =>
-    evaluateState(store.getSnapshot(), action, resource);
+  const evaluate = <T extends ResourceName<S>>(
+    action: S[T],
+    resource: ResourceFor<T>,
+  ): Decision => evaluateState<S, T>(store.getSnapshot(), action, resource);
 
   let current: AbortController | undefined;
 
-  const load = async (loader: AuthorizationLoader): Promise<void> => {
+  const load = async (loader: AuthorizationLoader<S>): Promise<void> => {
     if (typeof loader !== "function") {
       throw new InvalidPolicyError("`load` requires a loader function.", {
         code: "LOADER_INVALID",
@@ -257,7 +273,7 @@ export function createAuthorizationStore(
 
       const next: {
         context?: Context;
-        engine?: Engine;
+        engine?: Engine<S>;
         subject?: Subject | undefined;
       } = {};
       if (Object.hasOwn(result, "subject")) {
@@ -267,7 +283,7 @@ export function createAuthorizationStore(
         next.context = createContext(ownProperty(result, "context") as Context);
       }
       if (Object.hasOwn(result, "engine")) {
-        next.engine = assertEngine(ownProperty(result, "engine"));
+        next.engine = assertEngine<S>(ownProperty(result, "engine"));
       }
       store.setState((state) => ({
         ...state,
@@ -288,8 +304,10 @@ export function createAuthorizationStore(
   };
 
   return Object.freeze({
-    can: (action: Action, resource: Resource): boolean =>
-      evaluate(action, resource).effect === "allow",
+    can: <T extends ResourceName<S>>(
+      action: S[T],
+      resource: ResourceFor<T>,
+    ): boolean => evaluate<T>(action, resource).effect === "allow",
     evaluate,
     getInitialSnapshot: store.getInitialSnapshot,
     getSnapshot: store.getSnapshot,
@@ -301,8 +319,8 @@ export function createAuthorizationStore(
         context: next,
       }));
     },
-    setEngine: (engine: Engine): void => {
-      const next = assertEngine(engine);
+    setEngine: (engine: Engine<S> | Engine): void => {
+      const next = assertEngine<S>(engine);
       store.setState((state) => ({
         ...state,
         engine: next,

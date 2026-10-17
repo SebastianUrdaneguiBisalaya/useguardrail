@@ -4,16 +4,17 @@ import type {
   DecisionCode,
   EvaluationInput,
   Evaluator,
+  Schema,
 } from "../types/index.js";
 
 /** Configuration for {@link createEngine}. */
-export type EngineConfig = {
+export type EngineConfig<S extends Schema = Schema> = {
   /** Authorization models (RBAC, ReBAC, ABAC...) consulted on every evaluation. */
-  readonly evaluators: readonly Evaluator[];
+  readonly evaluators: readonly (Evaluator<S> | Evaluator)[];
 };
 
 /** A framework-independent authorization engine. */
-export type Engine = {
+export type Engine<S extends Schema = Schema> = {
   /**
    * Evaluates an access request against every configured evaluator.
    *
@@ -25,7 +26,7 @@ export type Engine = {
    * const decision = engine.evaluate({ subject, action: "read", resource, context });
    * if (decision.effect === "allow") { ... }
    */
-  readonly evaluate: (input: EvaluationInput) => Decision;
+  readonly evaluate: (input: EvaluationInput<S>) => Decision;
 };
 
 const deny = (reason: string, code: DecisionCode): Decision =>
@@ -80,7 +81,9 @@ const isDecision = (value: unknown): value is Decision => {
  * @example
  * const engine = createEngine({ evaluators: [rbacEvaluator, abacEvaluator] });
  */
-export function createEngine(config: EngineConfig): Engine {
+export function createEngine<S extends Schema = Schema>(
+  config: EngineConfig<S>,
+): Engine<S> {
   const evaluators: unknown = config?.evaluators;
   if (
     !Array.isArray(evaluators) ||
@@ -93,11 +96,11 @@ export function createEngine(config: EngineConfig): Engine {
       },
     );
   }
-  const registered: readonly Evaluator[] = Object.freeze([
-    ...(evaluators as Evaluator[]),
+  const registered: readonly Evaluator<S>[] = Object.freeze([
+    ...(evaluators as Evaluator<S>[]),
   ]);
 
-  const evaluate = (input: EvaluationInput): Decision => {
+  const evaluate = (input: EvaluationInput<S>): Decision => {
     let allowed: Decision | undefined;
 
     for (const evaluator of registered) {

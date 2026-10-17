@@ -1,18 +1,26 @@
 import { InvalidPolicyError } from "../errors.js";
 import { ownProperty } from "../own.js";
-import type { Evaluator } from "../types/index.js";
+import type { Evaluator, ResourceName, Schema } from "../types/index.js";
 import type { RelationGraph } from "./graph.js";
 
+/**
+ * The relation a subject must hold on a resource to perform an action, keyed by resource
+ * type then action. With a schema, only its resource types and their actions are accepted.
+ */
+export type RebacRequirements<S extends Schema = Schema> = {
+  readonly [T in ResourceName<S>]?: {
+    readonly [A in S[T]]?: string;
+  };
+};
+
 /** Configuration for {@link createRebacEvaluator}. */
-export type RebacConfig = {
+export type RebacConfig<S extends Schema = Schema> = {
   readonly graph: RelationGraph;
   /**
    * The relation a subject must hold on a resource to perform an action, keyed by
    * resource type then action, e.g. `{ document: { read: "viewer", update: "editor" } }`.
    */
-  readonly requirements: Readonly<
-    Record<string, Readonly<Record<string, string>>>
-  >;
+  readonly requirements: RebacRequirements<S>;
 };
 
 /**
@@ -30,7 +38,9 @@ export type RebacConfig = {
  *   requirements: { doc: { read: "viewer", update: "editor" } },
  * });
  */
-export function createRebacEvaluator(config: RebacConfig): Evaluator {
+export function createRebacEvaluator<S extends Schema = Schema>(
+  config: RebacConfig<S>,
+): Evaluator<S> {
   const graph: unknown = config?.graph;
   if (
     typeof graph !== "object" ||
@@ -96,7 +106,7 @@ export function createRebacEvaluator(config: RebacConfig): Evaluator {
 
   const { check } = graph as RelationGraph;
 
-  return ({ action, resource, subject }) => {
+  const evaluator: Evaluator = ({ action, resource, subject }) => {
     const relation = requirements.get(resource.type)?.get(action);
     const id = ownProperty(resource, "id");
     if (relation === undefined || id === undefined) {
@@ -115,4 +125,6 @@ export function createRebacEvaluator(config: RebacConfig): Evaluator {
         }
       : undefined;
   };
+
+  return evaluator as unknown as Evaluator<S>;
 }

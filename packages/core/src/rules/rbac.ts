@@ -1,25 +1,39 @@
 import { InvalidPolicyError } from "../errors.js";
 import { ownProperty } from "../own.js";
-import type { Evaluator } from "../types/index.js";
+import type { Evaluator, Schema } from "../types/index.js";
+
+/**
+ * A permission string for a schema: `"*"`, `"<type>:<action>"`, `"<type>:*"`, or `"*:<action>"`
+ * with the types and actions the schema declares. Without a schema, any string (checked when
+ * the evaluator is created).
+ */
+export type PermissionString<S extends Schema = Schema> = string extends keyof S
+  ? string
+  :
+      | "*"
+      | `*:${S[keyof S & string]}`
+      | {
+          [T in keyof S & string]: `${T}:${S[T]}` | `${T}:*`;
+        }[keyof S & string];
 
 /** A role and the permissions it grants. */
-export type RoleDefinition = {
+export type RoleDefinition<S extends Schema = Schema> = {
   /**
    * Permissions as `"<resourceType>:<action>"`. Either side may be `"*"`
    * (e.g. `"invoice:*"`, `"*:read"`), and `"*"` alone grants everything.
    */
-  readonly permissions: readonly string[];
+  readonly permissions: readonly PermissionString<S>[];
   /** Names of other roles whose permissions this role also receives. */
   readonly inherits?: readonly string[];
 };
 
 /** Configuration for {@link createRbacEvaluator}. */
-export type RbacConfig = {
+export type RbacConfig<S extends Schema = Schema> = {
   /** Role definitions keyed by role name. */
-  readonly roles: Readonly<Record<string, RoleDefinition>>;
+  readonly roles: Readonly<Record<string, RoleDefinition<S>>>;
 };
 
-type Permission = {
+type ParsedPermission = {
   readonly resource: string;
   readonly action: string;
 };
@@ -28,7 +42,7 @@ const parsePermission = (
   permission: unknown,
   role: string,
   index: number,
-): Permission => {
+): ParsedPermission => {
   if (typeof permission !== "string") {
     throw new InvalidPolicyError(
       `Role "${role}" has a non-string permission at index ${index}.`,
@@ -84,7 +98,9 @@ const isStringArray = (value: unknown): value is readonly string[] =>
  *   },
  * });
  */
-export function createRbacEvaluator(config: RbacConfig): Evaluator {
+export function createRbacEvaluator<S extends Schema = Schema>(
+  config: RbacConfig<S>,
+): Evaluator<S> {
   const rawRoles: unknown = config?.roles;
   if (
     typeof rawRoles !== "object" ||
@@ -138,11 +154,11 @@ export function createRbacEvaluator(config: RbacConfig): Evaluator {
     definitions.set(name, candidate as RoleDefinition);
   }
 
-  const resolved = new Map<string, readonly Permission[]>();
+  const resolved = new Map<string, readonly ParsedPermission[]>();
   const resolve = (
     name: string,
     path: readonly string[],
-  ): readonly Permission[] => {
+  ): readonly ParsedPermission[] => {
     const cached = resolved.get(name);
     if (cached) {
       return cached;
@@ -197,7 +213,7 @@ export function createRbacEvaluator(config: RbacConfig): Evaluator {
     resolve(name, []);
   }
 
-  return ({ action, resource, subject }) => {
+  const evaluator: Evaluator = ({ action, resource, subject }) => {
     const assigned = ownProperty(subject, "roles");
     for (const role of (Array.isArray(assigned)
       ? assigned
@@ -224,4 +240,6 @@ export function createRbacEvaluator(config: RbacConfig): Evaluator {
     }
     return undefined;
   };
+
+  return evaluator as unknown as Evaluator<S>;
 }

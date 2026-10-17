@@ -71,16 +71,56 @@ export type Decision = {
   readonly params?: MessageParams;
 };
 
-/** Everything an evaluator needs to decide on a single access request. */
-export type EvaluationInput = {
-  readonly subject: Subject;
-  readonly action: Action;
-  readonly resource: Resource;
-  readonly context: Context;
+/**
+ * Describes which actions exist on which resource types, so actions and resources are
+ * checked at compile time. Keys are resource types; values are the union of their actions.
+ *
+ * Declare it with `type` (not `interface`, which has no implicit index signature).
+ *
+ * @example
+ * type AppSchema = {
+ *   invoice: "read" | "update" | "delete";
+ *   user: "read" | "invite";
+ * };
+ */
+export type Schema = Readonly<Record<string, string>>;
+
+/** The resource types a schema declares. With the loose default schema, any string. */
+export type ResourceName<S extends Schema = Schema> = keyof S & string;
+
+/** Every action a schema declares, across all resource types. With the loose default, any string. */
+export type ActionName<S extends Schema = Schema> = S[keyof S & string];
+
+/** A resource of type `T`. */
+export type ResourceFor<T extends string = string> = {
+  readonly type: T;
+  readonly id?: string;
+  readonly attributes?: Attributes;
 };
+
+/**
+ * Everything an evaluator needs to decide on a single access request.
+ *
+ * With a schema, this is a union with one member per resource type, so an `action` can only
+ * be paired with a `resource.type` that declares it. (TypeScript does not narrow the union
+ * from `input.resource.type`, since that discriminant is nested.)
+ */
+export type EvaluationInput<S extends Schema = Schema> = {
+  [T in ResourceName<S>]: {
+    readonly subject: Subject;
+    readonly action: S[T];
+    readonly resource: ResourceFor<T>;
+    readonly context: Context;
+  };
+}[ResourceName<S>];
 
 /**
  * A pluggable authorization model (RBAC, ReBAC, ABAC...).
  * Returns a {@link Decision}, or `undefined` when it has no opinion.
+ *
+ * An evaluator written without a schema accepts any request, so engine configs accept it next
+ * to schema-bound ones.
  */
-export type Evaluator = (input: EvaluationInput) => Decision | undefined;
+export type Evaluator<S extends Schema = Schema> = (
+  input: EvaluationInput<S>,
+) => Decision | undefined;

@@ -12,6 +12,7 @@ export {
 export type {
   InheritRule,
   RebacConfig,
+  RebacRequirements,
   RelationGraph,
   RelationGraphConfig,
   RelationRule,
@@ -26,10 +27,13 @@ export type {
   AbacPolicy,
   Condition,
   ConditionOperator,
+  PermissionString,
   RbacConfig,
   RoleDefinition,
 } from "./rules/index.js";
 export { createAbacEvaluator, createRbacEvaluator } from "./rules/index.js";
+export type { SchemaKit } from "./schema.js";
+export { forSchema } from "./schema.js";
 export type {
   AuthorizationLoader,
   AuthorizationLoadResult,
@@ -46,6 +50,7 @@ export type { Listener, Store, Unsubscribe } from "./store/index.js";
 export { createStore } from "./store/index.js";
 export type {
   Action,
+  ActionName,
   Attributes,
   Context,
   Decision,
@@ -55,6 +60,9 @@ export type {
   Evaluator,
   MessageParams,
   Resource,
+  ResourceFor,
+  ResourceName,
+  Schema,
   Subject,
 } from "./types/index.js";
 export { DECISION_CODES } from "./types/index.js";
