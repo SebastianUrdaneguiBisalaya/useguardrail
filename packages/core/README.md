@@ -119,7 +119,7 @@ A condition is either a field comparison or a group, and groups nest:
 
 ### ReBAC: `createRelationGraph` + `createRebacEvaluator`
 
-Facts are tuples `{ object, relation, subject }`. Subjects may be usersets (`"team:eng#member"`). Rules add implied relations and inheritance through links such as `parent`. Traversal is cycle-safe and depth-limited (`maxDepth`, 16 by default; deeper paths count as not related).
+Facts are tuples `{ object, relation, subject }`. Subjects may be usersets (`"team:eng#member"`) or wildcards (`"user:*"`). Rules add implied relations and inheritance through links such as `parent`. Traversal is cycle-safe and depth-limited (`maxDepth`, 16 by default; deeper paths count as not related).
 
 ```ts
 import { createRebacEvaluator, createRelationGraph } from "@useguardril/core";
@@ -143,9 +143,50 @@ const rebac = createRebacEvaluator({
 
 The subject reference is `subject.id`; the resource reference is `"<type>:<id>"`. Both must match the references used in your tuples. The graph is immutable: when relations change, build a new graph and swap the engine (see below).
 
+#### Wildcard subjects (public access)
+
+A tuple whose subject is `"<type>:*"` grants the relation to **every subject whose reference starts with `<type>:`**:
+
+```ts
+const graph = createRelationGraph({
+  tuples: [{ object: "doc:handbook", relation: "viewer", subject: "user:*" }],
+});
+
+graph.check("user:ana", "viewer", "doc:handbook"); // true: any "user:..."
+graph.check("bot:r2", "viewer", "doc:handbook"); // false: different type
+```
+
+- It matches by the whole type prefix (`user:`), so `username:ana` is not covered.
+- It works with implied relations and inheritance, and as a member inside a userset (`team:eng` has `member` `user:*`), but a wildcard **cannot be the userset itself** (`"team:*#member"` is rejected with `TUPLE_REFERENCE_INVALID`), and `":*"` with no type is rejected too.
+- A bare `*` is just an ordinary reference, not a wildcard.
+- Wildcards grant to anyone who is signed in with that type of reference; a signed-out store is still denied (`NO_SUBJECT`).
+
+#### Per-tenant graphs: `createTenantRelationGraph`
+
+For multi-tenant apps, give each tenant its own graph so a relation in one tenant can never grant access in another, even when their references look alike:
+
+```ts
+import { createRebacEvaluator, createTenantRelationGraph } from "@useguardril/core";
+
+const graph = createTenantRelationGraph({
+  tuples: {
+    acme: [{ object: "doc:1", relation: "viewer", subject: "user:ana" }],
+    globex: [{ object: "doc:1", relation: "viewer", subject: "user:bob" }],
+  },
+  rules, // optional, shared by every tenant
+});
+
+const rebac = createRebacEvaluator({ graph, requirements: { doc: { read: "viewer" } } });
+// The evaluator picks the graph by context.tenantId:
+//   context { tenantId: "acme" }   -> only acme's tuples are consulted
+//   no tenantId, or an unknown one -> no opinion, so the result is deny
+```
+
+`graph.forTenant(id)` returns that tenant's `RelationGraph` (or `undefined`), `graph.check(tenantId, subject, relation, object)` is the shortcut, and `graph.tenants()` lists the ids. When a tenant's tuples are invalid, the error names the tenant (`params.tenantId`). Switch tenants with `store.setContext({ tenantId })`.
+
 ## Context and multi-tenancy
 
-Tenancy is always explicit, carried in `context`, never in module-level state. `createContext` validates and freezes it. The graph does not isolate tenants by itself: put the tenant in your references (`"acme/doc:1"`) or use one graph per tenant.
+Tenancy is always explicit, carried in `context`, never in module-level state. `createContext` validates and freezes it. A plain relation graph does not isolate tenants by itself: use `createTenantRelationGraph` (see the ReBAC section) so each tenant gets its own graph.
 
 ## Reactive store
 
