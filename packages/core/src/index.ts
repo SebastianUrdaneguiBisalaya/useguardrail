@@ -6,6 +6,15 @@ export {
   InvalidPolicyError,
 } from "./errors.js";
 export type {
+  AbacConfig,
+  AbacPolicy,
+  Condition,
+  ConditionOperator,
+  RbacConfig,
+  RoleDefinition,
+} from "./rules/index.js";
+export { createAbacEvaluator, createRbacEvaluator } from "./rules/index.js";
+export type {
   Action,
   Attributes,
   Context,
