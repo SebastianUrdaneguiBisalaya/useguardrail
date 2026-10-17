@@ -53,6 +53,35 @@ describe("createSessionAdapter", () => {
     });
   });
 
+  it("maps context attributes when present", () => {
+    const adapt = createSessionAdapter({
+      contextAttributes: {
+        plan: "organization.plan",
+      },
+      subjectId: "id",
+      tenantId: "organization.id",
+    });
+    expect(
+      adapt({
+        id: "u",
+        organization: {
+          id: "o",
+          plan: "pro",
+        },
+      }),
+    ).toEqual({
+      context: {
+        attributes: {
+          plan: "pro",
+        },
+        tenantId: "o",
+      },
+      subject: {
+        id: "u",
+      },
+    });
+  });
+
   it("accepts roles as plain strings and numeric ids", () => {
     const adapt = createSessionAdapter({
       roles: "roles",
