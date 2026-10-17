@@ -20,11 +20,14 @@ import type {
   Decision,
   DecisionCode,
   DecisionEffect,
+  DecisionEvent,
   Engine,
   EngineConfig,
   ErrorCode,
   EvaluationInput,
   Evaluator,
+  EvaluatorOutcome,
+  EvaluatorTrace,
   MessageParams,
   RbacConfig,
   RelationGraph,
@@ -33,6 +36,7 @@ import type {
   Resource,
   RoleDefinition,
   Store,
+  StoreDecisionEvent,
   Subject,
 } from "../../src/index.js";
 import {
@@ -264,3 +268,48 @@ createAuthorizationStore({
 declare const store: AuthorizationStore;
 // @ts-expect-error "error" is set with setError, not setStatus
 store.setStatus("error");
+
+// ---- Debugging and auditing ----
+
+expectTypeOf<EvaluatorOutcome>().toEqualTypeOf<
+  "allow" | "deny" | "abstain" | "threw" | "malformed"
+>();
+expectTypeOf<EvaluatorTrace["index"]>().toEqualTypeOf<number>();
+expectTypeOf<EvaluatorTrace["outcome"]>().toEqualTypeOf<EvaluatorOutcome>();
+expectTypeOf<EvaluatorTrace["decision"]>().toEqualTypeOf<
+  Decision | undefined
+>();
+expectTypeOf<EvaluatorTrace["error"]>().toEqualTypeOf<unknown>();
+expectTypeOf<DecisionEvent["input"]>().toEqualTypeOf<EvaluationInput>();
+expectTypeOf<DecisionEvent["decision"]>().toEqualTypeOf<Decision>();
+expectTypeOf<DecisionEvent["trace"]>().toEqualTypeOf<
+  readonly EvaluatorTrace[]
+>();
+expectTypeOf<Engine["explain"]>().toEqualTypeOf<
+  (input: EvaluationInput) => DecisionEvent
+>();
+expectTypeOf<EngineConfig["onDecision"]>().toEqualTypeOf<
+  ((event: DecisionEvent) => void) | undefined
+>();
+expectTypeOf<AuthorizationStoreConfig["onDecision"]>().toEqualTypeOf<
+  ((event: StoreDecisionEvent) => void) | undefined
+>();
+expectTypeOf<
+  StoreDecisionEvent["status"]
+>().toEqualTypeOf<AuthorizationStatus>();
+expectTypeOf<StoreDecisionEvent["subject"]>().toEqualTypeOf<
+  Subject | undefined
+>();
+expectTypeOf<StoreDecisionEvent["trace"]>().toEqualTypeOf<
+  readonly EvaluatorTrace[]
+>();
+expectTypeOf(looseStore.explain).toBeCallableWith("anything", {
+  type: "anything",
+});
+expectTypeOf(looseStore.explain).returns.toEqualTypeOf<StoreDecisionEvent>();
+
+createEngine({
+  evaluators: [],
+  // @ts-expect-error the hook receives an event, not a number
+  onDecision: (event: number) => event,
+});

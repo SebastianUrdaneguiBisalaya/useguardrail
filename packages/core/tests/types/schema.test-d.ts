@@ -290,3 +290,42 @@ export const inferredEngine = createEngineDirect({
   ],
 });
 expectTypeOf(inferredEngine).toEqualTypeOf<Engine<AppSchema>>();
+
+// ---- Debugging and auditing keep the schema ----
+
+export const audited = auth.createEngine({
+  evaluators: [
+    rbac,
+  ],
+  onDecision: (event) => {
+    expectTypeOf(event.input).toEqualTypeOf<EvaluationInput<AppSchema>>();
+    expectTypeOf(event.decision.effect).toEqualTypeOf<"allow" | "deny">();
+  },
+});
+export const explained = audited.explain({
+  action: "read",
+  context,
+  resource: {
+    type: "invoice",
+  },
+  subject,
+});
+expectTypeOf(explained.input).toEqualTypeOf<EvaluationInput<AppSchema>>();
+
+// @ts-expect-error "invite" is not an invoice action
+audited.explain({
+  action: "invite",
+  context,
+  resource: {
+    type: "invoice",
+  },
+  subject,
+});
+
+store.explain("invite", {
+  type: "user",
+});
+// @ts-expect-error "invite" is not an invoice action
+store.explain("invite", {
+  type: "invoice",
+});
