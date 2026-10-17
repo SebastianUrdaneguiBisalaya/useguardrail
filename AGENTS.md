@@ -215,6 +215,7 @@ Dependency direction is one-way: `react`, `adapters` → `core`. `core` never im
 
 - The engine is a pure, synchronous-by-default evaluator: `(subject, action, resource, context) → Decision`. Model RBAC, ReBAC, and ABAC as pluggable evaluators that compose into one decision; don't special-case one model in the engine.
 - The reactive store is hand-rolled (`subscribe` / `getSnapshot`) and compatible with `useSyncExternalStore`. **Do not add Zustand or any state library** as a dependency.
+- Schema typing (`Schema`, `forSchema<S>()`) is compile-time only: it must never change runtime behavior, every generic defaults to the loose schema (so schema-less code keeps compiling), and runtime validation stays in place for plain-JS callers. Cover each typed surface with `tests/types/*.test-d.ts` (what must compile and what must not).
 - No classes (section 2): `createEngine(config)`, `createStore(initial)`, etc. return plain objects/closures.
 - Decisions must be deterministic and side-effect free; the same inputs always produce the same result. Default to **deny** when no rule matches or evaluation fails.
 - Multi-tenancy is explicit: tenant identity travels in `context`, never in module-level state.
