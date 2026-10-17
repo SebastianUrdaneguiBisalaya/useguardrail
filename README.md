@@ -142,6 +142,7 @@ Rule of thumb: **mistakes in configuration throw when you create the engine, eva
 | ABAC conditions inside one policy | AND only | There is no OR inside a policy; write several policies instead (any matching `allow` grants, any matching `deny` wins). |
 | ReBAC resource without an `id`, or an action with no requirement | — | The evaluator has no opinion, so the result is `deny` unless another evaluator allows. |
 | An evaluator that throws, or returns a malformed decision | — | `deny`. The error detail is not exposed in the decision. |
+| An evaluator called directly (outside an engine or store) with a structurally invalid input | — | May throw a `TypeError`. The engine and the store catch it and deny, so always evaluate through one of them. |
 | ReBAC wildcard subjects (such as OpenFGA's `user:*`) | not supported | Kept as written and match nobody. |
 | Evaluation | synchronous only | There is no async evaluator. Fetch data with `store.load(...)` (see [Loading state](#loading-state)); until it arrives, every check is denied with code `LOADING`. |
 | A loader that throws or returns invalid data | — | The store goes to `"error"` and denies everything (`LOAD_FAILED`); `load` itself never rejects. |

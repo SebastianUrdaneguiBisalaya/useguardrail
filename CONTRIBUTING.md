@@ -86,6 +86,7 @@ pnpm --filter @useguardril/core run bench
 
 - Add or update tests under the package's `tests/`, mirroring the structure of its `src/`.
 - Cover, for each rule model you touch: allow, deny, default-deny, and malformed input.
+- Invariants ("never throws", "deny wins", "traversal terminates") are also checked with property-based tests ([fast-check](https://fast-check.dev/)) in `tests/properties/`, comparing the real code against a deliberately naive reference implementation. If you change evaluation logic, extend the reference and the generators too. A failing property prints a counterexample and a seed to replay it.
 - Never call a real backend or authorization service in tests; use sample payloads.
 - Cross-package behavior is tested in the consuming package: `core` + `react` in `packages/react/tests/integration/`, `adapters` + `core` in `packages/adapters/tests/integration/`.
 
