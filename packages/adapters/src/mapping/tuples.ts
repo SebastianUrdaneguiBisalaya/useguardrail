@@ -72,8 +72,8 @@ const openFga = createTuplesAdapter({
 
 /**
  * Adapter for an OpenFGA `Read` response (`{ tuples: [{ key: { user, relation, object } }] }`).
- * Userset subjects such as `"team:eng#member"` map directly. Wildcard subjects (`"user:*"`)
- * are kept as written and match nobody, because the core graph has no wildcard support.
+ * Userset subjects such as `"team:eng#member"` and wildcard subjects such as `"user:*"` map
+ * directly; `@useguardril/core` understands both.
  */
 export const openFgaTuplesAdapter: Adapter<RelationTuple[]> = openFga;
 

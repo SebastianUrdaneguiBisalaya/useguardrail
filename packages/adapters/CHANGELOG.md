@@ -6,6 +6,8 @@ All notable changes to `@useguardril/adapters` are documented here. This project
 
 ### Added
 
+- Docs: OpenFGA wildcard subjects (`user:*`) now take effect in the core graph.
+
 - `createSessionAdapter`: session/profile response to `Subject` and `Context`.
 - `createRolesAdapter`: roles response to RBAC role definitions.
 - `createTuplesAdapter`, `openFgaTuplesAdapter`, `spiceDbTuplesAdapter`: relation tuples for the ReBAC graph.

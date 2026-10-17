@@ -73,7 +73,7 @@ import { openFgaTuplesAdapter } from "@useguardril/adapters";
 const graph = createRelationGraph({ tuples: openFgaTuplesAdapter(await readTuples()) });
 ```
 
-Userset subjects (`"team:eng#member"`) are preserved. OpenFGA wildcard subjects (`"user:*"`) are kept as written and match nobody, because the core graph has no wildcard support.
+Userset subjects (`"team:eng#member"`) and wildcard subjects (`"user:*"`, public access for every `user:...`) are preserved as written; the core graph understands both.
 
 ## Writing your own
 
