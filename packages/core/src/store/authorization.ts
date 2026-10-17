@@ -65,7 +65,7 @@ export type AuthorizationLoader = (options: {
 /** A reactive store that couples an engine with the current subject and context. */
 export type AuthorizationStore = Pick<
   Store<AuthorizationState>,
-  "getSnapshot" | "subscribe" | "subscribeSelector"
+  "getInitialSnapshot" | "getSnapshot" | "subscribe" | "subscribeSelector"
 > & {
   /**
    * Evaluates an action against the current subject, context, and engine. Never throws.
@@ -151,6 +151,38 @@ const assertSubject = (subject: unknown): Subject | undefined => {
 };
 
 /**
+ * Evaluates an action against a given store state, without touching any store. Pure and never
+ * throws. While the state's `status` is `"loading"` or `"error"` the result is always `deny`.
+ *
+ * `store.evaluate` is this function applied to the current state; UI adapters also use it on
+ * `store.getInitialSnapshot()` to render the same answer on the server and during hydration.
+ *
+ * @example
+ * evaluateState(store.getInitialSnapshot(), "read", { type: "doc", id: "1" });
+ */
+export function evaluateState(
+  state: AuthorizationState,
+  action: Action,
+  resource: Resource,
+): Decision {
+  const { context, engine, status, subject } = state;
+  if (status === "loading") {
+    return LOADING;
+  }
+  if (status === "error") {
+    return LOAD_FAILED;
+  }
+  return subject
+    ? engine.evaluate({
+        action,
+        context,
+        resource,
+        subject,
+      })
+    : NO_SUBJECT;
+}
+
+/**
  * Creates the reactive authorization store consumed by UI adapters.
  * Pair `can` with `subscribe`/`getSnapshot` so a component only re-renders when its own
  * answer changes.
@@ -182,23 +214,8 @@ export function createAuthorizationStore(
     subject: assertSubject(config.subject),
   });
 
-  const evaluate = (action: Action, resource: Resource): Decision => {
-    const { context, engine, status, subject } = store.getSnapshot();
-    if (status === "loading") {
-      return LOADING;
-    }
-    if (status === "error") {
-      return LOAD_FAILED;
-    }
-    return subject
-      ? engine.evaluate({
-          action,
-          context,
-          resource,
-          subject,
-        })
-      : NO_SUBJECT;
-  };
+  const evaluate = (action: Action, resource: Resource): Decision =>
+    evaluateState(store.getSnapshot(), action, resource);
 
   let current: AbortController | undefined;
 
@@ -274,6 +291,7 @@ export function createAuthorizationStore(
     can: (action: Action, resource: Resource): boolean =>
       evaluate(action, resource).effect === "allow",
     evaluate,
+    getInitialSnapshot: store.getInitialSnapshot,
     getSnapshot: store.getSnapshot,
     load,
     setContext: (context: Context): void => {

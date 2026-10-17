@@ -38,7 +38,10 @@ export type {
   AuthorizationStore,
   AuthorizationStoreConfig,
 } from "./store/authorization.js";
-export { createAuthorizationStore } from "./store/authorization.js";
+export {
+  createAuthorizationStore,
+  evaluateState,
+} from "./store/authorization.js";
 export type { Listener, Store, Unsubscribe } from "./store/index.js";
 export { createStore } from "./store/index.js";
 export type {
