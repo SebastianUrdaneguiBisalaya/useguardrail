@@ -235,6 +235,7 @@ Dependency direction is one-way: `react`, `adapters` → `core`. `core` never im
 - Vitest; mock any HTTP/backend boundary, never hit a real service.
 - Cover per rule model (RBAC, ReBAC, ABAC): allow, deny, default-deny, and malformed input.
 - Property-based tests (`fast-check`, in `tests/properties/`) check the invariants the README promises — evaluation never throws, deny wins, ReBAC traversal terminates, stale loads never win — against naive reference implementations. Keep the reference simple; never copy the production algorithm into it.
+- Type-level tests (`tests/types/*.test-d.ts`) pin the public `.d.ts` contract; they are checked by `tsc` through `pnpm run typecheck`.
 - Integration tests assert that `core` store updates re-render only the components subscribed to the affected permission.
 - `packages/core/tests/performance/` holds benchmarks (`vitest bench`) for evaluation over large policy/relation sets; investigate regressions there like failing tests.
 
