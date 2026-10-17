@@ -1,9 +1,13 @@
+import type { ErrorDetails } from "@useguardril/core";
 import { AuthorizationError } from "@useguardril/core";
 
 /** Thrown when a hook or component is used outside an `AuthorizationProvider`. */
 export class MissingProviderError extends AuthorizationError {
-  constructor(message: string, options?: ErrorOptions) {
-    super(message, options);
+  constructor(message: string, details: ErrorDetails = {}) {
+    super(message, {
+      ...details,
+      code: details.code ?? "PROVIDER_MISSING",
+    });
     this.name = "MissingProviderError";
   }
 }

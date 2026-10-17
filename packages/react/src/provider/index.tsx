@@ -43,6 +43,9 @@ export function useAuthorizationStore(): AuthorizationStore {
   if (store === null) {
     throw new MissingProviderError(
       "useAuthorizationStore must be used inside an <AuthorizationProvider>.",
+      {
+        code: "PROVIDER_MISSING",
+      },
     );
   }
   return store;

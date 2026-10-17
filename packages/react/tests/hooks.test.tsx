@@ -103,6 +103,15 @@ describe("useCan", () => {
         }),
       ),
     ).toThrow(MissingProviderError);
+    try {
+      renderHook(() =>
+        useCan("read", {
+          type: "invoice",
+        }),
+      );
+    } catch (error) {
+      expect((error as MissingProviderError).code).toBe("PROVIDER_MISSING");
+    }
     spy.mockRestore();
   });
 });

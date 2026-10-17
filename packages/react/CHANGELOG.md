@@ -7,5 +7,5 @@ All notable changes to `@useguardril/react` are documented here. This project fo
 ### Added
 
 - `AuthorizationProvider`, `useAuthorizationStore`, `useCan`, `useSubject`, and `<Can>`.
-- `MissingProviderError`.
+- `MissingProviderError` (code `PROVIDER_MISSING`).
 - Selective re-rendering through `useSyncExternalStore`, covered by core + react integration tests.
