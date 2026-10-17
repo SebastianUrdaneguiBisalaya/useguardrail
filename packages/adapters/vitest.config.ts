@@ -10,6 +10,14 @@ export default defineConfig({
     },
   },
   test: {
+    coverage: {
+      include: [
+        "src/**",
+      ],
+      reporter: [
+        "text",
+      ],
+    },
     passWithNoTests: true,
   },
 });
