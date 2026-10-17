@@ -6,7 +6,6 @@
  */
 import { expectTypeOf } from "vitest";
 import type {
-  AbacConfig,
   AbacPolicy,
   Action,
   AuthorizationLoader,
@@ -28,7 +27,6 @@ import type {
   Evaluator,
   MessageParams,
   RbacConfig,
-  RebacConfig,
   RelationGraph,
   RelationGraphConfig,
   RelationTuple,
@@ -110,20 +108,10 @@ expectTypeOf<AuthorizationError>().toExtend<Error>();
 
 // ---- Engine and evaluators ----
 
-expectTypeOf(createEngine).parameter(0).toEqualTypeOf<EngineConfig>();
-expectTypeOf(createEngine).returns.toEqualTypeOf<Engine>();
 expectTypeOf<Engine["evaluate"]>().toEqualTypeOf<
   (input: EvaluationInput) => Decision
 >();
-expectTypeOf<EngineConfig["evaluators"]>().toEqualTypeOf<
-  readonly Evaluator[]
->();
-expectTypeOf(createRbacEvaluator).parameter(0).toEqualTypeOf<RbacConfig>();
-expectTypeOf(createRbacEvaluator).returns.toEqualTypeOf<Evaluator>();
-expectTypeOf(createAbacEvaluator).parameter(0).toEqualTypeOf<AbacConfig>();
-expectTypeOf(createAbacEvaluator).returns.toEqualTypeOf<Evaluator>();
-expectTypeOf(createRebacEvaluator).parameter(0).toEqualTypeOf<RebacConfig>();
-expectTypeOf(createRebacEvaluator).returns.toEqualTypeOf<Evaluator>();
+expectTypeOf<EngineConfig["evaluators"]>().toExtend<readonly Evaluator[]>();
 expectTypeOf<RbacConfig["roles"]>().toEqualTypeOf<
   Readonly<Record<string, RoleDefinition>>
 >();
@@ -141,6 +129,36 @@ expectTypeOf<ConditionOperator>().toEqualTypeOf<
 >();
 expectTypeOf<AbacPolicy["effect"]>().toEqualTypeOf<"allow" | "deny">();
 expectTypeOf<Condition["op"]>().toEqualTypeOf<ConditionOperator>();
+
+// The factories are generic over a schema; without one they take and return the loose types.
+declare const looseEngine: Engine;
+declare const looseGraph: RelationGraph;
+expectTypeOf(
+  createEngine({
+    evaluators: [],
+  }),
+).toEqualTypeOf<Engine>();
+expectTypeOf(
+  createRbacEvaluator({
+    roles: {},
+  }),
+).toEqualTypeOf<Evaluator>();
+expectTypeOf(
+  createAbacEvaluator({
+    policies: [],
+  }),
+).toEqualTypeOf<Evaluator>();
+expectTypeOf(
+  createRebacEvaluator({
+    graph: looseGraph,
+    requirements: {},
+  }),
+).toEqualTypeOf<Evaluator>();
+expectTypeOf(
+  createAuthorizationStore({
+    engine: looseEngine,
+  }),
+).toEqualTypeOf<AuthorizationStore>();
 
 createEngine({
   // @ts-expect-error evaluators must be an array
@@ -199,18 +217,20 @@ expectTypeOf<AuthorizationState["error"]>().toEqualTypeOf<unknown>();
 expectTypeOf<AuthorizationStoreConfig["status"]>().toEqualTypeOf<
   "loading" | "ready" | undefined
 >();
-expectTypeOf(createAuthorizationStore)
-  .parameter(0)
-  .toEqualTypeOf<AuthorizationStoreConfig>();
 expectTypeOf(
   createAuthorizationStore,
 ).returns.toEqualTypeOf<AuthorizationStore>();
-expectTypeOf<AuthorizationStore["can"]>().toEqualTypeOf<
-  (action: Action, resource: Resource) => boolean
->();
-expectTypeOf<AuthorizationStore["evaluate"]>().toEqualTypeOf<
-  (action: Action, resource: Resource) => Decision
->();
+// Without a schema the store accepts any action and resource type (and stays generic over them).
+declare const looseStore: AuthorizationStore;
+expectTypeOf(looseStore.can).toBeCallableWith("anything", {
+  type: "anything",
+});
+expectTypeOf(looseStore.can).returns.toEqualTypeOf<boolean>();
+expectTypeOf(looseStore.evaluate).toBeCallableWith("anything", {
+  id: "1",
+  type: "anything",
+});
+expectTypeOf(looseStore.evaluate).returns.toEqualTypeOf<Decision>();
 expectTypeOf<AuthorizationStore["getSnapshot"]>().toEqualTypeOf<
   () => AuthorizationState
 >();
