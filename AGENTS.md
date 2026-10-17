@@ -122,7 +122,7 @@ This is achieved by:
 
 ## 7. Local development workflow
 
-The exact sequence of commands — for a human contributor or an AI agent — to run after making a source change, how to try the built package locally, and what to run before opening a pull request now lives in the **"Development"** section of [README.md](./README.md). Follow that instead of duplicating it here; update it there if the workflow changes.
+After any source change, run from the repo root and fix each failure before moving on: `pnpm run lint:fix`, `pnpm run typecheck`, `pnpm run test`, `pnpm run build` (scripts are defined in the root `package.json`). Husky hooks run the same checks on commit and push.
 
 ## 8. Target environment: server, client, or both
 
@@ -191,28 +191,24 @@ packages/
       store/              # reactive store (subscribe/getSnapshot)
       types/              # shared public types
       errors.ts           # typed error classes
-    tests/                # mirrors src/
+    tests/                # mirrors src/ (+ tests/performance/ benchmarks)
   react/                  # @useguardril/react — React adapter
     src/
       index.ts
       provider/           # AuthorizationProvider
       hooks/              # useCan(), ...
       components/         # <Can>
-    tests/
+    tests/                # mirrors src/ (+ tests/integration/ for core + react)
   adapters/               # @useguardril/adapters — backend response -> SDK contract
     src/
       index.ts
       mapping/
     tests/
-tests/
-  integration/            # cross-package tests (core + react)
-  performance/            # benchmarks
-  fixtures/               # shared fixtures
 ```
 
-- Per-package `tests/` mirror `src/` (section 1); root `tests/` holds only cross-package suites.
+- Per-package `tests/` mirror `src/` (section 1). There is no root `tests/`: each package owns its vitest config, so cross-package integration tests live in the consuming package (`packages/react/tests/integration/`, which resolves `@useguardril/core` to its source) and benchmarks live next to the code they measure (`packages/core/tests/performance/`, run with `pnpm --filter @useguardril/core run bench`).
 - `apps/*` are never published. `biome.json` lives at the repo root; each package owns its own `tsconfig.base.json` (extended by its `tsconfig.json`) and `vitest.config.ts`.
-- Start with these three packages. Each ships its own unit tests; `core` + `react` also get integration tests. There is no separate testing package: test factories and fixtures live in each package's `tests/` (or in root `tests/fixtures/` when shared).
+- Start with these three packages. Each ships its own unit tests; `core` + `react` also get integration tests. There is no separate testing package: test factories and fixtures live in each package's `tests/`.
 
 ## 2. Package responsibilities
 
@@ -246,7 +242,7 @@ Dependency direction is one-way: `react`, `adapters` → `core`. `core` never im
 - Vitest; mock any HTTP/backend boundary, never hit a real service.
 - Cover per rule model (RBAC, ReBAC, ABAC): allow, deny, default-deny, and malformed input.
 - Integration tests assert that `core` store updates re-render only the components subscribed to the affected permission.
-- `performance/` holds benchmarks for evaluation over large policy/relation sets; regressions there are treated like failing tests.
+- `packages/core/tests/performance/` holds benchmarks (`vitest bench`) for evaluation over large policy/relation sets; investigate regressions there like failing tests.
 
 ## 7. Documentation for consumers
 
