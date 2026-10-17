@@ -1,5 +1,11 @@
 export { createContext } from "./context/index.js";
-export type { Engine, EngineConfig } from "./engine/index.js";
+export type {
+  DecisionEvent,
+  Engine,
+  EngineConfig,
+  EvaluatorOutcome,
+  EvaluatorTrace,
+} from "./engine/index.js";
 export { createEngine } from "./engine/index.js";
 export type { ErrorCode, ErrorDetails } from "./errors.js";
 export {
@@ -41,6 +47,7 @@ export type {
   AuthorizationStatus,
   AuthorizationStore,
   AuthorizationStoreConfig,
+  StoreDecisionEvent,
 } from "./store/authorization.js";
 export {
   createAuthorizationStore,

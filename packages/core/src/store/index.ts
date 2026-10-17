@@ -1,3 +1,5 @@
+import { rethrowAsync } from "../report.js";
+
 /** Called after the store's state changes. */
 export type Listener = () => void;
 
@@ -71,9 +73,7 @@ export function createStore<T>(initial: T): Store<T> {
       try {
         listener();
       } catch (error) {
-        queueMicrotask(() => {
-          throw error;
-        });
+        rethrowAsync(error);
       }
     }
   };

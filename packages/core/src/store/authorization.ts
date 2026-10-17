@@ -1,7 +1,8 @@
 import { createContext } from "../context/index.js";
-import type { Engine } from "../engine/index.js";
+import type { Engine, EvaluatorTrace } from "../engine/index.js";
 import { InvalidContextError, InvalidPolicyError } from "../errors.js";
 import { ownProperty } from "../own.js";
+import { rethrowAsync } from "../report.js";
 import type {
   Context,
   Decision,
@@ -33,6 +34,25 @@ export type AuthorizationState<S extends Schema = Schema> = {
   readonly error: unknown;
 };
 
+/**
+ * Everything about one check made through the store: the request, the state it ran in, and the
+ * decision. Meant for debugging and auditing; treat it as read-only.
+ */
+export type StoreDecisionEvent<S extends Schema = Schema> = {
+  readonly action: S[ResourceName<S>];
+  readonly resource: ResourceFor<ResourceName<S>>;
+  readonly subject: Subject | undefined;
+  readonly context: Context;
+  /** The store's status when the check ran. */
+  readonly status: AuthorizationStatus;
+  readonly decision: Decision;
+  /**
+   * What each consulted evaluator answered. Empty when the engine was not consulted
+   * (the store was loading or in error, or nobody was signed in).
+   */
+  readonly trace: readonly EvaluatorTrace[];
+};
+
 /** Configuration for {@link createAuthorizationStore}. */
 export type AuthorizationStoreConfig<S extends Schema = Schema> = {
   /** An engine for the schema, or one without a schema (it accepts any request). */
@@ -45,6 +65,17 @@ export type AuthorizationStoreConfig<S extends Schema = Schema> = {
    * can show a skeleton instead of flashing "no access".
    */
   readonly status?: "loading" | "ready";
+  /**
+   * Called after every check made through the store (`can`, `evaluate`, `explain`), including
+   * checks denied because the store is loading, failed, or has no subject, which never reach
+   * the engine. Use it for debugging and auditing; the library itself never logs.
+   *
+   * Components call `can` during render, so this fires on every such check (and more than once
+   * per render in React). It cannot change the decision; if it throws, the error is rethrown
+   * asynchronously. The event contains the subject and context, so redact it before sending it
+   * anywhere. The engine has its own `onDecision` for evaluations.
+   */
+  readonly onDecision?: (event: StoreDecisionEvent<S>) => void;
 };
 
 /**
@@ -78,6 +109,18 @@ export type AuthorizationStore<S extends Schema = Schema> = Pick<
     action: S[T],
     resource: ResourceFor<T>,
   ) => Decision;
+  /**
+   * Like `evaluate`, but returns the whole {@link StoreDecisionEvent}: the decision, the state
+   * it ran in, and what each evaluator answered. Use it to find out why something was denied.
+   * It reports to `onDecision` like `evaluate` does. Never throws.
+   *
+   * @example
+   * const { decision, status, trace } = store.explain("update", { type: "invoice", id });
+   */
+  readonly explain: <T extends ResourceName<S>>(
+    action: S[T],
+    resource: ResourceFor<T>,
+  ) => StoreDecisionEvent<S>;
   /** Shorthand for `evaluate(...).effect === "allow"`. */
   readonly can: <T extends ResourceName<S>>(
     action: S[T],
@@ -196,12 +239,51 @@ export function evaluateState<
     : NO_SUBJECT;
 }
 
+const explainState = <S extends Schema, T extends ResourceName<S>>(
+  state: AuthorizationState<S>,
+  action: S[T],
+  resource: ResourceFor<T>,
+): StoreDecisionEvent<S> => {
+  const { context, engine, status, subject } = state;
+  let decision: Decision;
+  let trace: readonly EvaluatorTrace[] = [];
+  if (status === "loading") {
+    decision = LOADING;
+  } else if (status === "error") {
+    decision = LOAD_FAILED;
+  } else if (!subject) {
+    decision = NO_SUBJECT;
+  } else {
+    const input = {
+      action,
+      context,
+      resource,
+      subject,
+    } as EvaluationInput<S>;
+    // A hand-written engine may not have `explain`; fall back to a decision without a trace.
+    if (typeof engine.explain === "function") {
+      ({ decision, trace } = engine.explain(input));
+    } else {
+      decision = engine.evaluate(input);
+    }
+  }
+  return Object.freeze({
+    action,
+    context,
+    decision,
+    resource,
+    status,
+    subject,
+    trace,
+  }) as unknown as StoreDecisionEvent<S>;
+};
+
 /**
  * Creates the reactive authorization store consumed by UI adapters.
  * Pair `can` with `subscribe`/`getSnapshot` so a component only re-renders when its own
  * answer changes.
  *
- * @throws {InvalidPolicyError} If `engine` is not an engine.
+ * @throws {InvalidPolicyError} If `engine` is not an engine, or `onDecision` is not a function.
  * @throws {InvalidContextError} If `subject` or `context` is malformed.
  *
  * @example
@@ -220,6 +302,19 @@ export function evaluateState<
 export function createAuthorizationStore<S extends Schema = Schema>(
   config: AuthorizationStoreConfig<S>,
 ): AuthorizationStore<S> {
+  const onDecision: unknown = config?.onDecision;
+  if (onDecision !== undefined && typeof onDecision !== "function") {
+    throw new InvalidPolicyError(
+      "Store config requires `onDecision` to be a function.",
+      {
+        code: "ON_DECISION_INVALID",
+      },
+    );
+  }
+  const hook = onDecision as
+    | ((event: StoreDecisionEvent<S>) => void)
+    | undefined;
+
   const store = createStore<AuthorizationState<S>>({
     context: createContext(config?.context),
     engine: assertEngine<S>(config?.engine),
@@ -228,10 +323,28 @@ export function createAuthorizationStore<S extends Schema = Schema>(
     subject: assertSubject(config.subject),
   });
 
+  const explain = <T extends ResourceName<S>>(
+    action: S[T],
+    resource: ResourceFor<T>,
+  ): StoreDecisionEvent<S> => {
+    const event = explainState<S, T>(store.getSnapshot(), action, resource);
+    if (hook !== undefined) {
+      try {
+        hook(event);
+      } catch (error) {
+        rethrowAsync(error);
+      }
+    }
+    return event;
+  };
+
   const evaluate = <T extends ResourceName<S>>(
     action: S[T],
     resource: ResourceFor<T>,
-  ): Decision => evaluateState<S, T>(store.getSnapshot(), action, resource);
+  ): Decision =>
+    hook === undefined
+      ? evaluateState<S, T>(store.getSnapshot(), action, resource)
+      : explain<T>(action, resource).decision;
 
   let current: AbortController | undefined;
 
@@ -309,6 +422,7 @@ export function createAuthorizationStore<S extends Schema = Schema>(
       resource: ResourceFor<T>,
     ): boolean => evaluate<T>(action, resource).effect === "allow",
     evaluate,
+    explain,
     getInitialSnapshot: store.getInitialSnapshot,
     getSnapshot: store.getSnapshot,
     load,
