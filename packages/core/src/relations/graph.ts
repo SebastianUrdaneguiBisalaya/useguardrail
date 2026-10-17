@@ -5,7 +5,9 @@ import { InvalidPolicyError } from "../errors.js";
  *
  * Objects and subjects are opaque references chosen by the consumer (e.g. `"document:1"`,
  * `"user:ana"`). A subject may be a userset, `"<ref>#<relation>"` (e.g. `"team:eng#member"`),
- * meaning everyone who has that relation on that reference.
+ * meaning everyone who has that relation on that reference. A subject may also be a wildcard,
+ * `"<type>:*"` (e.g. `"user:*"`), meaning every subject whose reference starts with `"<type>:"`
+ * (public access). A wildcard cannot be part of a userset.
  */
 export type RelationTuple = {
   readonly object: string;
@@ -59,10 +61,31 @@ const isReference = (value: unknown): value is string =>
 const isStringArray = (value: unknown): value is readonly string[] =>
   Array.isArray(value) && value.every(isReference);
 
-const isUserset = (subject: string): boolean => {
+const WILDCARD_SUFFIX = ":*";
+
+/** A `<type>:*` reference: everyone whose reference starts with `<type>:`. */
+const isWildcard = (reference: string): boolean =>
+  reference.endsWith(WILDCARD_SUFFIX);
+
+/** Valid subjects are `<ref>`, `<type>:*`, or `<ref>#<relation>` (never a wildcard userset). */
+const isValidSubject = (subject: string): boolean => {
   const parts = subject.split("#");
-  return parts.length <= 2 && parts.every((part) => part !== "");
+  if (parts.length > 2 || parts.some((part) => part === "")) {
+    return false;
+  }
+  const reference = parts[0] as string;
+  if (isWildcard(reference)) {
+    return parts.length === 1 && reference.length > WILDCARD_SUFFIX.length;
+  }
+  return true;
 };
+
+/** Whether a tuple's wildcard subject (`user:*`) covers a concrete subject (`user:ana`). */
+const wildcardCovers = (wildcard: string, subject: string): boolean =>
+  isWildcard(wildcard) &&
+  !isWildcard(subject) &&
+  subject.startsWith(wildcard.slice(0, -1)) &&
+  subject.length > wildcard.length - 1;
 
 /**
  * Builds a relation graph (ReBAC) from tuples and optional rewrite rules.
@@ -124,9 +147,13 @@ export function createRelationGraph(
         },
       );
     }
-    if (object.includes("#") || relation.includes("#") || !isUserset(subject)) {
+    if (
+      object.includes("#") ||
+      relation.includes("#") ||
+      !isValidSubject(subject)
+    ) {
       throw new InvalidPolicyError(
-        `Relation tuple at index ${position} is invalid: "#" is only allowed once in a subject, as "<ref>#<relation>".`,
+        `Relation tuple at index ${position} is invalid: "#" is only allowed once in a subject, as "<ref>#<relation>", and a "<type>:*" wildcard cannot be part of a userset.`,
         {
           code: "TUPLE_REFERENCE_INVALID",
           params: {
@@ -244,7 +271,7 @@ export function createRelationGraph(
       visited.add(key);
 
       for (const candidate of index.get(key) ?? []) {
-        if (candidate === subject) {
+        if (candidate === subject || wildcardCovers(candidate, subject)) {
           return true;
         }
         const hash = candidate.indexOf("#");

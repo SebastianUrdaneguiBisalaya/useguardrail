@@ -23,10 +23,13 @@ export type {
   RelationGraphConfig,
   RelationRule,
   RelationTuple,
+  TenantRelationGraph,
+  TenantRelationGraphConfig,
 } from "./relations/index.js";
 export {
   createRebacEvaluator,
   createRelationGraph,
+  createTenantRelationGraph,
 } from "./relations/index.js";
 export type {
   AbacConfig,

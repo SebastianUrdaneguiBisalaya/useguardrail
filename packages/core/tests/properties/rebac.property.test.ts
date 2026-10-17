@@ -1,12 +1,20 @@
 import * as fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import type { RelationRule, RelationTuple } from "../../src/index.js";
-import { createRelationGraph } from "../../src/index.js";
+import {
+  createRelationGraph,
+  createTenantRelationGraph,
+} from "../../src/index.js";
 
+// Typed references so that `<type>:*` wildcards have something to match.
 const USERS = [
-  "u0",
-  "u1",
-  "u2",
+  "user:u0",
+  "user:u1",
+  "bot:u2",
+];
+const WILDCARDS = [
+  "user:*",
+  "bot:*",
 ];
 const OBJECTS = [
   "o0",
@@ -23,6 +31,7 @@ const RELATIONS = [
 
 const subjectArb = fc.oneof(
   fc.constantFrom(...USERS),
+  fc.constantFrom(...WILDCARDS),
   fc.constantFrom(...OBJECTS),
   fc
     .tuple(fc.constantFrom(...OBJECTS), fc.constantFrom(...RELATIONS))
@@ -90,7 +99,17 @@ const derive = (
     for (const tuple of tuples) {
       const hash = tuple.subject.indexOf("#");
       if (hash === -1) {
-        add(key(tuple.subject, tuple.relation, tuple.object));
+        if (tuple.subject.endsWith(":*")) {
+          // A wildcard covers every concrete subject with the same type prefix.
+          const prefix = tuple.subject.slice(0, -1);
+          for (const user of USERS) {
+            if (user.startsWith(prefix)) {
+              add(key(user, tuple.relation, tuple.object));
+            }
+          }
+        } else {
+          add(key(tuple.subject, tuple.relation, tuple.object));
+        }
         continue;
       }
       const reference = tuple.subject.slice(0, hash);
@@ -219,6 +238,50 @@ describe("ReBAC properties", () => {
           expect(typeof graph.check(subject, relation, object)).toBe("boolean");
         },
       ),
+    );
+  });
+
+  it("a tenant graph answers for each tenant exactly like a graph built from that tenant's tuples alone", () => {
+    fc.assert(
+      fc.property(tuplesArb, tuplesArb, rulesArb, (acme, globex, rules) => {
+        const tenants = createTenantRelationGraph({
+          maxDepth: 200,
+          rules,
+          tuples: {
+            acme,
+            globex,
+          },
+        });
+        const alone = {
+          acme: createRelationGraph({
+            maxDepth: 200,
+            rules,
+            tuples: acme,
+          }),
+          globex: createRelationGraph({
+            maxDepth: 200,
+            rules,
+            tuples: globex,
+          }),
+        };
+        for (const tenant of [
+          "acme",
+          "globex",
+        ] as const) {
+          for (const user of USERS) {
+            for (const relation of RELATIONS) {
+              for (const object of OBJECTS) {
+                expect(tenants.check(tenant, user, relation, object)).toBe(
+                  alone[tenant].check(user, relation, object),
+                );
+              }
+            }
+          }
+        }
+      }),
+      {
+        numRuns: 200,
+      },
     );
   });
 });

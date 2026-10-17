@@ -2,6 +2,7 @@ import { InvalidPolicyError } from "../errors.js";
 import { ownProperty } from "../own.js";
 import type { Evaluator, ResourceName, Schema } from "../types/index.js";
 import type { RelationGraph } from "./graph.js";
+import type { TenantRelationGraph } from "./tenant.js";
 
 /**
  * The relation a subject must hold on a resource to perform an action, keyed by resource
@@ -15,7 +16,12 @@ export type RebacRequirements<S extends Schema = Schema> = {
 
 /** Configuration for {@link createRebacEvaluator}. */
 export type RebacConfig<S extends Schema = Schema> = {
-  readonly graph: RelationGraph;
+  /**
+   * The relations to consult: a single graph, or a per-tenant graph from
+   * `createTenantRelationGraph`, in which case the graph is picked by `context.tenantId` and a
+   * missing or unknown tenant means no opinion.
+   */
+  readonly graph: RelationGraph | TenantRelationGraph;
   /**
    * The relation a subject must hold on a resource to perform an action, keyed by
    * resource type then action, e.g. `{ document: { read: "viewer", update: "editor" } }`.
@@ -45,10 +51,11 @@ export function createRebacEvaluator<S extends Schema = Schema>(
   if (
     typeof graph !== "object" ||
     graph === null ||
-    typeof (graph as RelationGraph).check !== "function"
+    (typeof (graph as RelationGraph).check !== "function" &&
+      typeof (graph as TenantRelationGraph).forTenant !== "function")
   ) {
     throw new InvalidPolicyError(
-      "ReBAC config requires a `graph` created with createRelationGraph.",
+      "ReBAC config requires a `graph` created with createRelationGraph or createTenantRelationGraph.",
       {
         code: "REBAC_GRAPH_REQUIRED",
       },
@@ -104,15 +111,33 @@ export function createRebacEvaluator<S extends Schema = Schema>(
     requirements.set(type, byAction);
   }
 
-  const { check } = graph as RelationGraph;
+  const tenantGraph =
+    typeof (graph as TenantRelationGraph).forTenant === "function"
+      ? (graph as TenantRelationGraph)
+      : undefined;
 
-  const evaluator: Evaluator = ({ action, resource, subject }) => {
+  const evaluator: Evaluator = ({ action, context, resource, subject }) => {
     const relation = requirements.get(resource.type)?.get(action);
     const id = ownProperty(resource, "id");
     if (relation === undefined || id === undefined) {
       return undefined;
     }
     const object = `${resource.type}:${String(id)}`;
+
+    let check: RelationGraph["check"];
+    if (tenantGraph === undefined) {
+      check = (graph as RelationGraph).check;
+    } else {
+      const tenantId = ownProperty(context, "tenantId");
+      const forTenant =
+        typeof tenantId === "string" && tenantId !== ""
+          ? tenantGraph.forTenant(tenantId)
+          : undefined;
+      if (forTenant === undefined) {
+        return undefined;
+      }
+      check = forTenant.check;
+    }
     return check(subject.id, relation, object)
       ? {
           code: "RELATION_GRANTS",
