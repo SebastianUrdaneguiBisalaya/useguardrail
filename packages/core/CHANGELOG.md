@@ -10,6 +10,8 @@ All notable changes to `@useguardril/core` are documented here. This project fol
 
 ### Added
 
+- Debugging and auditing: `engine.explain(input)` and `store.explain(action, resource)` (decision plus a per-evaluator trace), and an `onDecision` hook on `createEngine` and `createAuthorizationStore`. New types `DecisionEvent`, `StoreDecisionEvent`, `EvaluatorTrace`, `EvaluatorOutcome`; new error code `ON_DECISION_INVALID`. No cost when the hook is absent.
+
 - Typed actions and resources: `Schema`, `forSchema<S>()`, and schema-aware `Engine<S>`, `Evaluator<S>`, `EvaluationInput<S>`, `AuthorizationStore<S>`, `RbacConfig<S>` (with `PermissionString<S>`), `AbacPolicy<S>`, and `RebacRequirements<S>`. Compile-time only; every type defaults to the loose schema, so existing code is unchanged.
 
 - `store.getInitialSnapshot()` (and `getInitialSnapshot` on `createStore`) plus the pure `evaluateState(state, action, resource)`, so UI adapters can render the same answer on the server and during hydration.

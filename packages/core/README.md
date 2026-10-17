@@ -144,6 +144,29 @@ Two helpers exist for UI adapters and server rendering:
 - `store.getInitialSnapshot()` returns the state the store was **created** with; it never changes. React uses it as the server snapshot so server rendering and hydration agree.
 - `evaluateState(state, action, resource)` is the pure function behind `store.evaluate`: it evaluates against any state you pass in (for example `store.getInitialSnapshot()`) without touching the store. It never throws.
 
+## Debugging and auditing
+
+`engine.explain(input)` and `store.explain(action, resource)` return the decision together with a per-evaluator `trace` (and, for the store, the `status` and subject it ran in), so you can find out why something was denied. `onDecision` on `createEngine` and `createAuthorizationStore` receives the same event after every evaluation; the library never logs on its own.
+
+```ts
+const { decision, trace } = engine.explain({ subject, action: "update", resource, context });
+trace.forEach(({ index, outcome }) => console.log(index, outcome)); // 0 "abstain", 1 "deny", ...
+
+const engine = createEngine({
+  evaluators,
+  onDecision: ({ input, decision }) => audit.push([input.action, decision.code]),
+});
+```
+
+| Export | Purpose |
+|---|---|
+| `Engine["explain"]` | Evaluates and returns a `DecisionEvent` (`{ input, decision, trace }`). |
+| `AuthorizationStore["explain"]` | Evaluates and returns a `StoreDecisionEvent` (`{ action, resource, subject, context, status, decision, trace }`). |
+| `EvaluatorTrace`, `EvaluatorOutcome` | One trace entry: `{ index, outcome, decision?, error? }`, where `outcome` is `"allow" \| "deny" \| "abstain" \| "threw" \| "malformed"`. |
+| `onDecision` | Optional hook on the engine and on the store. Cannot change the decision; its errors are rethrown asynchronously. |
+
+Evaluation stops at the first evaluator that denies, throws, or misbehaves, so later ones are not in the trace. Events hold the full request (attributes included); redact before sending them anywhere. See the [root README](../../README.md#debugging-and-auditing) for the full guide and caveats.
+
 ## Typed schema (actions and resources)
 
 Declare which actions each resource type supports and the compiler checks every permission, policy scope, relation requirement, and `can(...)` call:
