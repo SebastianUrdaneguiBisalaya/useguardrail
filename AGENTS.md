@@ -238,7 +238,7 @@ Dependency direction is one-way: `react`, `adapters` → `core`. `core` never im
 ## 5. Public API and errors
 
 - Every package exposes its surface only through its own `src/index.ts` (section 1).
-- Define and export typed errors from `core` (e.g. `InvalidPolicyError`, `AdapterMappingError`); never throw bare `Error`. Fail closed: invalid policies deny rather than allow.
+- Define and export typed errors from `core` (e.g. `InvalidPolicyError`, `AdapterMappingError`); never throw bare `Error`. Error types are the one exception to the no-`class` rule (section 2): they extend `Error` so consumers can use `instanceof`. Nothing else in `src/` may use `class`. Fail closed: invalid policies deny rather than allow.
 - Validate policy and adapter input at runtime — consumers may be in plain JS and the cost of a wrong "allow" is high.
 
 ## 6. Testing
